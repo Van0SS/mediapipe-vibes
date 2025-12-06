@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Russian Roulette Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+        }
+
+        #container {
+            position: relative;
+            text-align: center;
+        }
+
+        #gameArea {
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse at center, #2a1a1a 0%, #0d0505 100%);
+            border: 4px solid #8b4513;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(139, 69, 19, 0.5), inset 0 0 100px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #videoContainer {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            border: 2px solid #8b4513;
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        #webcam {
+            width: 320px;
+            height: 240px;
+            transform: scaleX(-1);
+            display: block;
+        }
+
+        #handCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 320px;
+            height: 240px;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+
+        #title {
+            color: #c9a227;
+            font-size: 42px;
+            text-shadow: 2px 2px 4px #000, 0 0 30px #c9a227;
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+            position: absolute;
+            top: 20px;
+            width: 100%;
+        }
+
+        #cylinder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .chamber {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border: 3px solid #666;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #444, #222);
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        .chamber.loaded {
+            background: radial-gradient(circle at 30% 30%, #8b4513, #5c2e0a);
+            border-color: #c9a227;
+        }
+
+        .chamber.current {
+            box-shadow: 0 0 20px #ff0000, inset 0 0 15px rgba(0,0,0,0.8);
+            border-color: #ff0000;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 160px;
+            width: 100%;
+            color: #c9a227;
+            font-size: 24px;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        #instruction {
+            position: absolute;
+            bottom: 80px;
+            width: 100%;
+            color: #aaa;
+            font-size: 18px;
+            padding: 0 20px;
+        }
+
+        #gestureStatus {
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            color: #888;
+            font-size: 16px;
+        }
+
+        #result {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: #ff0000;
+            text-shadow: 0 0 50px #ff0000, 0 0 100px #ff0000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 20;
+        }
+
+        #result.show {
+            opacity: 1;
+        }
+
+        #result.safe {
+            color: #00ff00;
+            text-shadow: 0 0 50px #00ff00, 0 0 100px #00ff00;
+        }
+
+        #stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #888;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            color: #c9a227;
+        }
+
+        #overlay h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px #c9a227;
+        }
+
+        #overlay p {
+            font-size: 18px;
+            margin: 10px 0;
+            color: #aaa;
+            max-width: 600px;
+        }
+
+        #overlay .gesture-demo {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(139, 69, 19, 0.2);
+            border-radius: 10px;
+            border: 1px solid #8b4513;
+        }
+
+        #overlay .gesture-demo h3 {
+            color: #c9a227;
+            margin-bottom: 15px;
+        }
+
+        #overlay .gesture-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            color: #ccc;
+        }
+
+        #overlay .gesture-item span {
+            font-size: 36px;
+            margin-right: 15px;
+        }
+
+        #startBtn {
+            margin-top: 30px;
+            padding: 15px 50px;
+            font-size: 24px;
+            background: transparent;
+            border: 2px solid #c9a227;
+            color: #c9a227;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+            border-radius: 5px;
+        }
+
+        #startBtn:hover {
+            background: #c9a227;
+            color: #000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        #flash.bang {
+            animation: flashBang 0.3s ease-out;
+        }
+
+        @keyframes flashBang {
+            0% { opacity: 0.9; }
+            100% { opacity: 0; }
+        }
+
+        #bloodOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, rgba(139, 0, 0, 0.8) 100%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 24;
+            transition: opacity 1s;
+        }
+
+        #bloodOverlay.show {
+            opacity: 1;
+        }
+
+        .spin {
+            animation: spinCylinder 1s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        @keyframes spinCylinder {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(1080deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="gameArea">
+            <h1 id="title">RUSSIAN ROULETTE</h1>
+
+            <div id="cylinder"></div>
+
+            <div id="result"></div>
+            <div id="flash"></div>
+            <div id="bloodOverlay"></div>
+
+            <div id="gestureStatus">Initializing camera...</div>
+            <div id="status">Show your hand to begin</div>
+            <div id="instruction">Make a gun gesture with your hand (index finger pointing)</div>
+
+            <div id="stats">
+                Survived: <span id="survived">0</span><br>
+                Deaths: <span id="deaths">0</span>
+            </div>
+
+            <div id="videoContainer">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="handCanvas" width="320" height="240"></canvas>
+            </div>
+
+            <div id="overlay">
+                <h1>🎰 RUSSIAN ROULETTE 🎰</h1>
+                <div class="gesture-demo">
+                    <h3>Hand Gestures:</h3>
+                    <div class="gesture-item">
+                        <span>👉</span>
+                        <div>
+                            <strong>1. Gun Gesture</strong> - Point index finger, curl other fingers<br>
+                            <small>This is your "revolver"</small>
+                        </div>
+                    </div>
+                    <div class="gesture-item">
+                        <span>✋</span>
+                        <div>
+                            <strong>2. Open Palm (other hand)</strong> - Show open palm to LOAD the gun<br>
+                            <small>One bullet will be loaded randomly</small>
+                        </div>
+                    </div>
+                    <div class="gesture-item">
+                        <span>🎯</span>
+                        <div>
+                            <strong>3. Point at your HEAD</strong> - Aim the gun at your face to FIRE<br>
+                            <small>The ray must hit your head bounding box!</small>
+                        </div>
+                    </div>
+                </div>
+                <p>⚠️ This is just a simulator! No actual harm involved.</p>
+                <button id="startBtn">BEGIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+    <script>
+        // DOM Elements
+        const cylinder = document.getElementById('cylinder');
+        const status = document.getElementById('status');
+        const instruction = document.getElementById('instruction');
+        const gestureStatus = document.getElementById('gestureStatus');
+        const result = document.getElementById('result');
+        const flash = document.getElementById('flash');
+        const bloodOverlay = document.getElementById('bloodOverlay');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
+        const survivedEl = document.getElementById('survived');
+        const deathsEl = document.getElementById('deaths');
+        const video = document.getElementById('webcam');
+        const handCanvas = document.getElementById('handCanvas');
+        const handCtx = handCanvas.getContext('2d');
+
+        // Game State
+        let gameStarted = false;
+        let isLoaded = false;
+        let bulletChamber = -1; // Which chamber has the bullet (0-5)
+        let currentChamber = 0;
+        let canFire = false;
+        let isSpinning = false;
+        let survived = 0;
+        let deaths = 0;
+
+        // Gesture State
+        let hasGunGesture = false;
+        let hasLoadGesture = false;
+        let isPointingAtSelf = false;
+        let isPointingAtHead = false;
+        let handsDetected = 0;
+
+        // Face tracking state
+        let faceDetected = false;
+        let headBounds = null; // {x, y, width, height} normalized
+        let faceLandmarks = null;
+
+        // Cooldowns
+        let lastLoadTime = 0;
+        let lastFireTime = 0;
+        const LOAD_COOLDOWN = 2000;
+        const FIRE_COOLDOWN = 3000;
+
+        // Create cylinder chambers
+        function createCylinder() {
+            cylinder.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                const chamber = document.createElement('div');
+                chamber.className = 'chamber';
+                const angle = (i * 60) * Math.PI / 180;
+                const radius = 80;
+                const x = 125 + radius * Math.cos(angle) - 25;
+                const y = 125 + radius * Math.sin(angle) - 25;
+                chamber.style.left = x + 'px';
+                chamber.style.top = y + 'px';
+                chamber.dataset.index = i;
+                cylinder.appendChild(chamber);
+            }
+            updateCylinderDisplay();
+        }
+
+        function updateCylinderDisplay() {
+            const chambers = cylinder.querySelectorAll('.chamber');
+            chambers.forEach((chamber, i) => {
+                chamber.classList.remove('loaded', 'current');
+                if (isLoaded && i === bulletChamber) {
+                    chamber.classList.add('loaded');
+                }
+                if (i === currentChamber) {
+                    chamber.classList.add('current');
+                }
+            });
+        }
+
+        // Load the gun
+        function loadGun() {
+            if (isLoaded || isSpinning) return;
+
+            const now = Date.now();
+            if (now - lastLoadTime < LOAD_COOLDOWN) return;
+            lastLoadTime = now;
+
+            bulletChamber = Math.floor(Math.random() * 6);
+            currentChamber = Math.floor(Math.random() * 6);
+            isLoaded = true;
+            canFire = true;
+
+            // Spin animation
+            cylinder.classList.add('spin');
+            isSpinning = true;
+
+            setTimeout(() => {
+                cylinder.classList.remove('spin');
+                isSpinning = false;
+                updateCylinderDisplay();
+            }, 1000);
+
+            status.textContent = 'Gun loaded... 1 bullet in 6 chambers';
+            instruction.textContent = 'Point the gun at yourself to pull the trigger';
+
+            // Play load sound effect (click)
+            playSound('load');
+        }
+
+        // Fire the gun
+        function fire() {
+            if (!isLoaded || !canFire || isSpinning) return;
+
+            const now = Date.now();
+            if (now - lastFireTime < FIRE_COOLDOWN) return;
+            lastFireTime = now;
+
+            canFire = false;
+            isSpinning = true;
+
+            // Spin to next chamber
+            currentChamber = (currentChamber + 1) % 6;
+
+            // Rotate cylinder visually
+            const rotation = currentChamber * 60;
+            cylinder.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+
+            setTimeout(() => {
+                isSpinning = false;
+
+                if (currentChamber === bulletChamber) {
+                    // BANG!
+                    bang();
+                } else {
+                    // Click - survived
+                    click();
+                }
+            }, 500);
+        }
+
+        function bang() {
+            flash.classList.add('bang');
+            setTimeout(() => flash.classList.remove('bang'), 300);
+
+            bloodOverlay.classList.add('show');
+
+            result.textContent = 'BANG!';
+            result.className = 'show';
+
+            status.textContent = 'You didn\'t make it...';
+            instruction.textContent = 'Show open palm to reset';
+
+            deaths++;
+            deathsEl.textContent = deaths;
+
+            playSound('bang');
+
+            // Reset after delay
+            setTimeout(() => {
+                resetGun();
+            }, 3000);
+        }
+
+        function click() {
+            result.textContent = 'CLICK';
+            result.className = 'show safe';
+
+            status.textContent = 'You survived this round!';
+            instruction.textContent = 'Point again to continue or show palm to reload';
+
+            survived++;
+            survivedEl.textContent = survived;
+
+            canFire = true;
+
+            playSound('click');
+
+            setTimeout(() => {
+                result.className = '';
+            }, 1500);
+        }
+
+        function resetGun() {
+            isLoaded = false;
+            canFire = false;
+            bulletChamber = -1;
+            currentChamber = 0;
+            cylinder.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+
+            result.className = '';
+            bloodOverlay.classList.remove('show');
+
+            status.textContent = 'Show gun gesture to begin';
+            instruction.textContent = 'Make a gun gesture, then show open palm to load';
+
+            updateCylinderDisplay();
+        }
+
+        // Simple sound effects using Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'load') {
+                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'click') {
+                oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.05);
+            } else if (type === 'bang') {
+                // Create noise for bang
+                const bufferSize = audioCtx.sampleRate * 0.5;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.1));
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                noise.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                noise.start(audioCtx.currentTime);
+            }
+        }
+
+        // MediaPipe Hands Setup
+        async function initHandTracking() {
+            const hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandResults);
+
+            // Face Mesh for head tracking
+            const faceMesh = new FaceMesh({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                }
+            });
+
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            faceMesh.onResults(onFaceResults);
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                const camera = new Camera(video, {
+                    onFrame: async () => {
+                        await hands.send({ image: video });
+                        await faceMesh.send({ image: video });
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                camera.start();
+                gestureStatus.textContent = 'Hand + Face tracking ready!';
+                gestureStatus.style.color = '#0f0';
+            } catch (err) {
+                gestureStatus.textContent = 'Camera error: ' + err.message;
+                gestureStatus.style.color = '#f00';
+            }
+        }
+
+        // Process face results
+        function onFaceResults(results) {
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                faceDetected = true;
+                faceLandmarks = results.multiFaceLandmarks[0];
+
+                // Calculate head bounding box from face landmarks
+                let minX = 1, maxX = 0, minY = 1, maxY = 0;
+                faceLandmarks.forEach(landmark => {
+                    minX = Math.min(minX, landmark.x);
+                    maxX = Math.max(maxX, landmark.x);
+                    minY = Math.min(minY, landmark.y);
+                    maxY = Math.max(maxY, landmark.y);
+                });
+
+                // Expand bounds slightly to include full head
+                const padding = 0.05;
+                headBounds = {
+                    x: Math.max(0, minX - padding),
+                    y: Math.max(0, minY - padding * 2), // More padding on top for forehead
+                    width: Math.min(1, maxX - minX + padding * 2),
+                    height: Math.min(1, maxY - minY + padding * 3)
+                };
+            } else {
+                faceDetected = false;
+                faceLandmarks = null;
+                headBounds = null;
+            }
+        }
+
+        // Draw hand landmarks on canvas
+        function drawHandLandmarks(results) {
+            handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+
+            // Draw face mesh and head bounds
+            if (faceDetected && faceLandmarks) {
+                // Draw face mesh outline (just key points for performance)
+                const faceOutlineIndices = [
+                    10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+                    397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+                    172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10
+                ];
+
+                handCtx.beginPath();
+                handCtx.strokeStyle = '#8844ff';
+                handCtx.lineWidth = 2;
+                faceOutlineIndices.forEach((idx, i) => {
+                    const point = faceLandmarks[idx];
+                    const x = point.x * handCanvas.width;
+                    const y = point.y * handCanvas.height;
+                    if (i === 0) handCtx.moveTo(x, y);
+                    else handCtx.lineTo(x, y);
+                });
+                handCtx.stroke();
+
+                // Draw head bounding box
+                if (headBounds) {
+                    const bx = headBounds.x * handCanvas.width;
+                    const by = headBounds.y * handCanvas.height;
+                    const bw = headBounds.width * handCanvas.width;
+                    const bh = headBounds.height * handCanvas.height;
+
+                    handCtx.strokeStyle = isPointingAtHead ? '#ff0000' : '#8844ff';
+                    handCtx.lineWidth = isPointingAtHead ? 3 : 2;
+                    handCtx.setLineDash([5, 5]);
+                    handCtx.strokeRect(bx, by, bw, bh);
+                    handCtx.setLineDash([]);
+
+                    // Draw target on head when aimed
+                    if (isPointingAtHead) {
+                        const centerX = bx + bw / 2;
+                        const centerY = by + bh / 2;
+                        const targetSize = Math.min(bw, bh) * 0.4;
+
+                        // Crosshair
+                        handCtx.strokeStyle = '#ff0000';
+                        handCtx.lineWidth = 2;
+                        handCtx.beginPath();
+                        handCtx.arc(centerX, centerY, targetSize, 0, Math.PI * 2);
+                        handCtx.stroke();
+                        handCtx.beginPath();
+                        handCtx.arc(centerX, centerY, targetSize * 0.6, 0, Math.PI * 2);
+                        handCtx.stroke();
+                        handCtx.beginPath();
+                        handCtx.moveTo(centerX - targetSize * 1.3, centerY);
+                        handCtx.lineTo(centerX + targetSize * 1.3, centerY);
+                        handCtx.moveTo(centerX, centerY - targetSize * 1.3);
+                        handCtx.lineTo(centerX, centerY + targetSize * 1.3);
+                        handCtx.stroke();
+
+                        // Label
+                        handCtx.font = 'bold 14px Arial';
+                        handCtx.fillStyle = '#ff0000';
+                        handCtx.strokeStyle = '#000';
+                        handCtx.lineWidth = 3;
+                        handCtx.strokeText('🎯 TARGET LOCKED', bx, by - 5);
+                        handCtx.fillText('🎯 TARGET LOCKED', bx, by - 5);
+                    } else {
+                        // Label
+                        handCtx.font = 'bold 12px Arial';
+                        handCtx.fillStyle = '#8844ff';
+                        handCtx.strokeStyle = '#000';
+                        handCtx.lineWidth = 2;
+                        handCtx.strokeText('HEAD', bx, by - 5);
+                        handCtx.fillText('HEAD', bx, by - 5);
+                    }
+                }
+            }
+
+            if (!results.multiHandLandmarks) return;
+
+            // Hand connections (bones)
+            const HAND_CONNECTIONS = [
+                [0, 1], [1, 2], [2, 3], [3, 4],           // Thumb
+                [0, 5], [5, 6], [6, 7], [7, 8],           // Index
+                [0, 9], [9, 10], [10, 11], [11, 12],      // Middle
+                [0, 13], [13, 14], [14, 15], [15, 16],    // Ring
+                [0, 17], [17, 18], [18, 19], [19, 20],    // Pinky
+                [5, 9], [9, 13], [13, 17], [0, 17]        // Palm
+            ];
+
+            results.multiHandLandmarks.forEach((landmarks, handIndex) => {
+                const handedness = results.multiHandedness[handIndex].label;
+                const isGun = detectGunGesture(landmarks);
+                const isPalm = detectOpenPalm(landmarks);
+                const isAimed = isGun && detectPointingAtHead(landmarks);
+
+                // Choose color based on gesture
+                let color = '#00ff00'; // Default green
+                if (isGun && isAimed) {
+                    color = '#ff0000'; // Red when aimed
+                } else if (isGun) {
+                    color = '#ffff00'; // Yellow for gun gesture
+                } else if (isPalm) {
+                    color = '#00ffff'; // Cyan for palm
+                }
+
+                // Draw connections (skeleton)
+                handCtx.strokeStyle = color;
+                handCtx.lineWidth = 2;
+
+                HAND_CONNECTIONS.forEach(([start, end]) => {
+                    const startPoint = landmarks[start];
+                    const endPoint = landmarks[end];
+
+                    handCtx.beginPath();
+                    handCtx.moveTo(startPoint.x * handCanvas.width, startPoint.y * handCanvas.height);
+                    handCtx.lineTo(endPoint.x * handCanvas.width, endPoint.y * handCanvas.height);
+                    handCtx.stroke();
+                });
+
+                // Draw landmarks (joints)
+                landmarks.forEach((landmark, index) => {
+                    const x = landmark.x * handCanvas.width;
+                    const y = landmark.y * handCanvas.height;
+
+                    // Different sizes for different joints
+                    let radius = 3;
+                    if (index === 0) radius = 6; // Wrist
+                    else if ([4, 8, 12, 16, 20].includes(index)) radius = 5; // Fingertips
+
+                    // Highlight index finger tip when gun gesture
+                    let pointColor = color;
+                    if (isGun && index === 8) {
+                        pointColor = isAimed ? '#ff0000' : '#ffff00';
+                        radius = 8;
+
+                        // Draw aiming circle around index tip
+                        handCtx.beginPath();
+                        handCtx.arc(x, y, 15, 0, Math.PI * 2);
+                        handCtx.strokeStyle = pointColor;
+                        handCtx.lineWidth = 2;
+                        handCtx.stroke();
+                    }
+
+                    handCtx.beginPath();
+                    handCtx.arc(x, y, radius, 0, Math.PI * 2);
+                    handCtx.fillStyle = pointColor;
+                    handCtx.fill();
+
+                    // Draw point border
+                    handCtx.strokeStyle = '#ffffff';
+                    handCtx.lineWidth = 1;
+                    handCtx.stroke();
+                });
+
+                // Draw direction arrow/ray for gun gesture
+                if (isGun) {
+                    const indexMcp = landmarks[5];
+                    const indexTip = landmarks[8];
+
+                    const startX = indexMcp.x * handCanvas.width;
+                    const startY = indexMcp.y * handCanvas.height;
+                    const endX = indexTip.x * handCanvas.width;
+                    const endY = indexTip.y * handCanvas.height;
+
+                    // Calculate direction
+                    const dx = endX - startX;
+                    const dy = endY - startY;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+
+                    // Extend the ray much further when aimed at head
+                    const rayLength = isAimed ? 300 : 50;
+                    const extendedX = endX + (dx / len) * rayLength;
+                    const extendedY = endY + (dy / len) * rayLength;
+
+                    // Draw laser beam when aimed
+                    if (isAimed) {
+                        // Glow effect
+                        handCtx.beginPath();
+                        handCtx.moveTo(endX, endY);
+                        handCtx.lineTo(extendedX, extendedY);
+                        handCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                        handCtx.lineWidth = 8;
+                        handCtx.stroke();
+
+                        // Core beam
+                        handCtx.beginPath();
+                        handCtx.moveTo(endX, endY);
+                        handCtx.lineTo(extendedX, extendedY);
+                        handCtx.strokeStyle = '#ff0000';
+                        handCtx.lineWidth = 2;
+                        handCtx.stroke();
+
+                        // Dashed line effect
+                        handCtx.setLineDash([10, 5]);
+                        handCtx.beginPath();
+                        handCtx.moveTo(endX, endY);
+                        handCtx.lineTo(extendedX, extendedY);
+                        handCtx.strokeStyle = '#ffff00';
+                        handCtx.lineWidth = 1;
+                        handCtx.stroke();
+                        handCtx.setLineDash([]);
+                    } else {
+                        // Normal arrow when not aimed
+                        handCtx.beginPath();
+                        handCtx.moveTo(endX, endY);
+                        handCtx.lineTo(extendedX, extendedY);
+                        handCtx.strokeStyle = '#ffff00';
+                        handCtx.lineWidth = 3;
+                        handCtx.stroke();
+                    }
+
+                    // Arrowhead
+                    const arrowSize = 10;
+                    const angle = Math.atan2(dy, dx);
+                    handCtx.beginPath();
+                    handCtx.moveTo(extendedX, extendedY);
+                    handCtx.lineTo(
+                        extendedX - arrowSize * Math.cos(angle - Math.PI / 6),
+                        extendedY - arrowSize * Math.sin(angle - Math.PI / 6)
+                    );
+                    handCtx.lineTo(
+                        extendedX - arrowSize * Math.cos(angle + Math.PI / 6),
+                        extendedY - arrowSize * Math.sin(angle + Math.PI / 6)
+                    );
+                    handCtx.closePath();
+                    handCtx.fillStyle = isAimed ? '#ff0000' : '#ffff00';
+                    handCtx.fill();
+                }
+
+                // Draw label
+                const wrist = landmarks[0];
+                handCtx.font = 'bold 12px Arial';
+                handCtx.fillStyle = color;
+                handCtx.strokeStyle = '#000';
+                handCtx.lineWidth = 2;
+                const label = isGun ? (isAimed ? '🎯 AIMED!' : '🔫 GUN') : (isPalm ? '✋ PALM' : handedness);
+                handCtx.strokeText(label, wrist.x * handCanvas.width - 20, wrist.y * handCanvas.height + 25);
+                handCtx.fillText(label, wrist.x * handCanvas.width - 20, wrist.y * handCanvas.height + 25);
+            });
+        }
+
+        // Process hand results
+        function onHandResults(results) {
+            // Always draw landmarks, even before game starts
+            drawHandLandmarks(results);
+
+            if (!gameStarted) return;
+
+            handsDetected = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+
+            hasGunGesture = false;
+            hasLoadGesture = false;
+            isPointingAtSelf = false;
+            isPointingAtHead = false;
+
+            if (results.multiHandLandmarks) {
+                results.multiHandLandmarks.forEach((landmarks, index) => {
+                    const handedness = results.multiHandedness[index].label;
+
+                    // Check for gun gesture (index extended, others curled)
+                    if (detectGunGesture(landmarks)) {
+                        hasGunGesture = true;
+
+                        // Check if pointing at head
+                        if (detectPointingAtHead(landmarks)) {
+                            isPointingAtSelf = true;
+                            isPointingAtHead = true;
+                        }
+                    }
+
+                    // Check for open palm (load gesture)
+                    if (detectOpenPalm(landmarks)) {
+                        hasLoadGesture = true;
+                    }
+                });
+            }
+
+            // Update gesture status
+            let gestureText = [];
+            if (hasGunGesture) gestureText.push('🔫 Gun');
+            if (hasLoadGesture) gestureText.push('✋ Palm');
+            if (isPointingAtHead) gestureText.push('🎯 HEAD!');
+            else if (!faceDetected) gestureText.push('👤 No face');
+            gestureStatus.textContent = gestureText.length > 0 ?
+                'Gestures: ' + gestureText.join(' | ') :
+                'Show hand gestures...';
+
+            // Game logic based on gestures
+            if (!isLoaded && hasGunGesture && hasLoadGesture) {
+                loadGun();
+            }
+
+            if (isLoaded && canFire && hasGunGesture && isPointingAtHead) {
+                fire();
+            }
+
+            // Allow reload after death with palm
+            if (!isLoaded && hasLoadGesture && hasGunGesture) {
+                loadGun();
+            }
+        }
+
+        // Detect gun gesture (index finger pointing, others curled)
+        function detectGunGesture(landmarks) {
+            const indexExtended = isFingerExtended(landmarks, 'index');
+            const middleCurled = !isFingerExtended(landmarks, 'middle');
+            const ringCurled = !isFingerExtended(landmarks, 'ring');
+            const pinkyCurled = !isFingerExtended(landmarks, 'pinky');
+
+            // Thumb can be up (like a real gun gesture) or curled
+            return indexExtended && middleCurled && ringCurled && pinkyCurled;
+        }
+
+        // Detect open palm (all fingers extended)
+        function detectOpenPalm(landmarks) {
+            const indexExtended = isFingerExtended(landmarks, 'index');
+            const middleExtended = isFingerExtended(landmarks, 'middle');
+            const ringExtended = isFingerExtended(landmarks, 'ring');
+            const pinkyExtended = isFingerExtended(landmarks, 'pinky');
+
+            return indexExtended && middleExtended && ringExtended && pinkyExtended;
+        }
+
+        // Check if finger is extended
+        function isFingerExtended(landmarks, finger) {
+            const fingerIndices = {
+                'index': { tip: 8, pip: 6, mcp: 5 },
+                'middle': { tip: 12, pip: 10, mcp: 9 },
+                'ring': { tip: 16, pip: 14, mcp: 13 },
+                'pinky': { tip: 20, pip: 18, mcp: 17 }
+            };
+
+            const indices = fingerIndices[finger];
+            const tip = landmarks[indices.tip];
+            const pip = landmarks[indices.pip];
+            const mcp = landmarks[indices.mcp];
+
+            // Finger is extended if tip is further from wrist than pip
+            // Using y coordinate (lower y = higher on screen = extended)
+            return tip.y < pip.y - 0.02;
+        }
+
+        // Detect if gun is pointing at head using ray casting
+        function detectPointingAtHead(landmarks) {
+            if (!headBounds || !faceDetected) return false;
+
+            const indexTip = landmarks[8];
+            const indexMcp = landmarks[5];
+
+            // Calculate direction vector of index finger
+            const dirX = indexTip.x - indexMcp.x;
+            const dirY = indexTip.y - indexMcp.y;
+
+            // Normalize direction
+            const len = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (len < 0.01) return false;
+
+            const normDirX = dirX / len;
+            const normDirY = dirY / len;
+
+            // Ray cast from finger tip in pointing direction
+            // Check if the ray intersects with head bounding box
+            const rayLength = 2.0; // Extend ray far enough
+            const steps = 20;
+
+            for (let i = 0; i < steps; i++) {
+                const t = (i / steps) * rayLength;
+                const rayX = indexTip.x + normDirX * t;
+                const rayY = indexTip.y + normDirY * t;
+
+                // Check if ray point is inside head bounds
+                if (rayX >= headBounds.x &&
+                    rayX <= headBounds.x + headBounds.width &&
+                    rayY >= headBounds.y &&
+                    rayY <= headBounds.y + headBounds.height) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Legacy function kept for compatibility
+        function detectPointingAtSelf(landmarks, handedness) {
+            return detectPointingAtHead(landmarks);
+        }
+
+        // Start game
+        startBtn.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+            gameStarted = true;
+            createCylinder();
+            // Resume audio context (needed for some browsers)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        });
+
+        // Initialize
+        initHandTracking();
+        createCylinder();
+    </script>
+</body>
+</html>

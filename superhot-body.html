@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUPER HOT - Full Body</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Arial Black', sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #webcam {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        #overlay h1 {
+            font-size: 100px;
+            color: #fff;
+            letter-spacing: 20px;
+            text-shadow: 0 0 50px #ff0000;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        #overlay h1 span {
+            color: #ff0000;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        #overlay p {
+            color: #888;
+            font-size: 24px;
+            margin-top: 30px;
+        }
+
+        #overlay .controls {
+            margin-top: 30px;
+            color: #666;
+            font-size: 16px;
+            text-align: center;
+            line-height: 2;
+        }
+
+        #startBtn {
+            margin-top: 40px;
+            padding: 20px 60px;
+            font-size: 32px;
+            background: transparent;
+            border: 3px solid #ff0000;
+            color: #ff0000;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 5px;
+            transition: all 0.3s;
+        }
+
+        #startBtn:hover {
+            background: #ff0000;
+            color: #000;
+        }
+
+        #demoToggle {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 18px;
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 3px;
+            transition: all 0.3s;
+        }
+
+        #demoToggle:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        #demoToggle.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        #demoIndicator {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #00ff00;
+            color: #000;
+            padding: 10px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            z-index: 100;
+            display: none;
+        }
+
+        #demoIndicator.show {
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #superhotText {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            color: #ff0000;
+            letter-spacing: 20px;
+            opacity: 0;
+            z-index: 150;
+            text-shadow: 0 0 50px #ff0000;
+            pointer-events: none;
+        }
+
+        #superhotText.show {
+            animation: superhotFlash 2s ease-out forwards;
+        }
+
+        @keyframes superhotFlash {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            40% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        #status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #ff0000;
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        #ui {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            color: #ff0000;
+            font-size: 18px;
+            z-index: 100;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <video id="webcam" autoplay playsinline></video>
+
+    <div id="status">Initializing pose detection...</div>
+    <div id="demoIndicator">DEMO MODE - INVINCIBLE</div>
+    <div id="ui">
+        <div id="timeIndicator">TIME: FROZEN</div>
+        <div id="waveInfo">WAVE: 1</div>
+        <div id="killInfo">KILLS: 0</div>
+    </div>
+    <div id="superhotText">SUPER HOT</div>
+
+    <div id="overlay">
+        <h1>SUPER <span>HOT</span></h1>
+        <p>TIME MOVES ONLY WHEN YOU MOVE</p>
+        <div class="controls">
+            🧍 STAND STILL - Time freezes completely<br>
+            🏃 MOVE SIGNIFICANTLY - Time flows (high threshold!)<br>
+            👉 POINT FINGER - Shoot enemies (re-point for each shot!)<br>
+            🤸 DODGE - Move your body to avoid bullets<br>
+            <br>
+            Stand back so your full body is visible!
+        </div>
+        <button id="demoToggle">DEMO MODE: OFF</button>
+        <button id="startBtn">START</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('webcam');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
+        const statusEl = document.getElementById('status');
+        const timeIndicator = document.getElementById('timeIndicator');
+        const waveInfo = document.getElementById('waveInfo');
+        const killInfo = document.getElementById('killInfo');
+        const superhotText = document.getElementById('superhotText');
+        const demoToggle = document.getElementById('demoToggle');
+        const demoIndicator = document.getElementById('demoIndicator');
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game state
+        let gameStarted = false;
+        let gameOver = false;
+        let demoMode = true; // Demo mode ON by default
+        let wave = 1;
+        let kills = 0;
+        let playerHealth = 5;
+
+        // Time mechanics
+        let timeScale = 0.01;
+        const MAX_TIME_SCALE = 1.0;
+        const MIN_TIME_SCALE = 0.01;
+        const MOVEMENT_THRESHOLD = 0.015; // High threshold - need significant movement
+        let bodyMovement = 0;
+        let smoothedMovement = 0;
+        let lastPoseLandmarks = null;
+
+        // Player body state (shooting with finger gun)
+        let player = {
+            landmarks: null,
+            velocity: [],
+            // Hand tracking for shooting
+            leftHand: null,
+            rightHand: null,
+            leftPointing: false,
+            rightPointing: false,
+            leftWasPointing: false,  // Previous frame state
+            rightWasPointing: false,
+            leftAimDir: { x: 0, y: 0 },
+            rightAimDir: { x: 0, y: 0 }
+        };
+
+        // Player bullets
+        let playerBullets = [];
+
+        // 3D projection settings (static camera angle)
+        const camera3D = {
+            fov: 500,
+            x: 0,
+            y: 0,
+            z: -800
+        };
+
+        // Game objects
+        let enemies = [];
+        let bullets = [];
+        let particles = [];
+        let shards = [];
+        let spawningWave = false;
+        let enemiesToSpawn = 0;
+
+        // Pose landmark indices
+        const POSE = {
+            NOSE: 0,
+            LEFT_EYE: 2,
+            RIGHT_EYE: 5,
+            LEFT_EAR: 7,
+            RIGHT_EAR: 8,
+            LEFT_SHOULDER: 11,
+            RIGHT_SHOULDER: 12,
+            LEFT_ELBOW: 13,
+            RIGHT_ELBOW: 14,
+            LEFT_WRIST: 15,
+            RIGHT_WRIST: 16,
+            LEFT_HIP: 23,
+            RIGHT_HIP: 24,
+            LEFT_KNEE: 25,
+            RIGHT_KNEE: 26,
+            LEFT_ANKLE: 27,
+            RIGHT_ANKLE: 28,
+            LEFT_PINKY: 17,
+            RIGHT_PINKY: 18,
+            LEFT_INDEX: 19,
+            RIGHT_INDEX: 20,
+            LEFT_THUMB: 21,
+            RIGHT_THUMB: 22,
+            LEFT_HEEL: 29,
+            RIGHT_HEEL: 30,
+            LEFT_FOOT: 31,
+            RIGHT_FOOT: 32
+        };
+
+        // Body connections for skeleton
+        const BODY_CONNECTIONS = [
+            // Torso
+            [POSE.LEFT_SHOULDER, POSE.RIGHT_SHOULDER],
+            [POSE.LEFT_SHOULDER, POSE.LEFT_HIP],
+            [POSE.RIGHT_SHOULDER, POSE.RIGHT_HIP],
+            [POSE.LEFT_HIP, POSE.RIGHT_HIP],
+            // Left arm
+            [POSE.LEFT_SHOULDER, POSE.LEFT_ELBOW],
+            [POSE.LEFT_ELBOW, POSE.LEFT_WRIST],
+            // Right arm
+            [POSE.RIGHT_SHOULDER, POSE.RIGHT_ELBOW],
+            [POSE.RIGHT_ELBOW, POSE.RIGHT_WRIST],
+            // Left leg
+            [POSE.LEFT_HIP, POSE.LEFT_KNEE],
+            [POSE.LEFT_KNEE, POSE.LEFT_ANKLE],
+            // Right leg
+            [POSE.RIGHT_HIP, POSE.RIGHT_KNEE],
+            [POSE.RIGHT_KNEE, POSE.RIGHT_ANKLE],
+            // Face
+            [POSE.LEFT_EAR, POSE.LEFT_EYE],
+            [POSE.RIGHT_EAR, POSE.RIGHT_EYE],
+            [POSE.LEFT_EYE, POSE.NOSE],
+            [POSE.RIGHT_EYE, POSE.NOSE]
+        ];
+
+        // 3D Enemy class
+        class Enemy3D {
+            constructor(index = 0, total = 1) {
+                // Spawn spread out around the player, closer distance
+                const angle = (index / total) * Math.PI * 2 + Math.random() * 0.5;
+                const distance = 250 + Math.random() * 100; // Closer: 250-350
+
+                this.x = Math.cos(angle) * distance;
+                this.z = Math.sin(angle) * distance + 150; // Offset forward
+                this.y = 0;
+                this.targetX = 0;
+                this.targetY = 0;
+                this.targetZ = 0;
+                this.speed = 1 + Math.random() * 0.5;
+                this.state = 'approaching';
+                this.stateTimer = 0;
+                this.aimTime = 90 + Math.random() * 60;
+                this.health = 1;
+                this.armAngle = 0;
+                this.legAngle = 0;
+                this.walkCycle = Math.random() * Math.PI * 2;
+            }
+
+            update(dt, playerPos) {
+                const scaledDt = dt * timeScale;
+                this.walkCycle += scaledDt * 0.1;
+
+                if (playerPos) {
+                    this.targetX = (playerPos.x - 0.5) * 600;
+                    this.targetY = (playerPos.y - 0.5) * 400;
+                }
+
+                switch(this.state) {
+                    case 'approaching':
+                        const dx = this.targetX - this.x;
+                        const dy = this.targetY - this.y;
+                        const dz = this.targetZ - this.z;
+                        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                        if (dist > 200) {
+                            this.x += (dx / dist) * this.speed * scaledDt * 60;
+                            this.y += (dy / dist) * this.speed * scaledDt * 60;
+                            this.z += (dz / dist) * this.speed * scaledDt * 60;
+                            this.legAngle = Math.sin(this.walkCycle) * 0.5;
+                        } else {
+                            this.state = 'aiming';
+                            this.stateTimer = 0;
+                        }
+                        break;
+
+                    case 'aiming':
+                        this.stateTimer += scaledDt * 60;
+                        if (this.stateTimer >= this.aimTime) {
+                            this.shoot(playerPos);
+                            this.state = 'shooting';
+                            this.stateTimer = 0;
+                        }
+                        break;
+
+                    case 'shooting':
+                        this.stateTimer += scaledDt * 60;
+                        if (this.stateTimer >= 30) {
+                            this.state = 'aiming';
+                            this.stateTimer = 0;
+                            this.aimTime = 60 + Math.random() * 40;
+                        }
+                        break;
+                }
+            }
+
+            shoot(playerPos) {
+                if (!playerPos) return;
+                const targetX = (playerPos.x - 0.5) * 600;
+                const targetY = (playerPos.y - 0.5) * 400;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const dz = -this.z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                bullets.push({
+                    x: this.x,
+                    y: this.y,
+                    z: this.z,
+                    vx: (dx / dist) * 8,
+                    vy: (dy / dist) * 8,
+                    vz: (dz / dist) * 8,
+                    fromEnemy: true
+                });
+            }
+
+            project() {
+                const scale = camera3D.fov / (camera3D.fov + this.z - camera3D.z);
+                return {
+                    x: canvas.width/2 + (this.x - camera3D.x) * scale,
+                    y: canvas.height/2 + (this.y - camera3D.y) * scale,
+                    scale: scale
+                };
+            }
+
+            draw() {
+                const p = this.project();
+                const size = 80 * p.scale;
+
+                if (p.scale <= 0) return;
+
+                ctx.save();
+                ctx.translate(p.x, p.y);
+
+                // Body glow
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 30 * p.scale;
+
+                // Head
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(0, -size * 0.8, size * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Torso
+                ctx.beginPath();
+                ctx.moveTo(0, -size * 0.55);
+                ctx.lineTo(-size * 0.3, -size * 0.2);
+                ctx.lineTo(-size * 0.25, size * 0.2);
+                ctx.lineTo(size * 0.25, size * 0.2);
+                ctx.lineTo(size * 0.3, -size * 0.2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Arms
+                ctx.lineWidth = size * 0.12;
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineCap = 'round';
+
+                // Left arm
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.3, -size * 0.45);
+                ctx.lineTo(-size * 0.5, -size * 0.1 + Math.sin(this.walkCycle) * size * 0.1);
+                ctx.lineTo(-size * 0.45, size * 0.2 + Math.sin(this.walkCycle) * size * 0.1);
+                ctx.stroke();
+
+                // Right arm (gun arm)
+                ctx.beginPath();
+                ctx.moveTo(size * 0.3, -size * 0.45);
+                ctx.lineTo(size * 0.6, -size * 0.3);
+                ctx.stroke();
+
+                // Gun
+                ctx.fillStyle = '#aa0000';
+                ctx.fillRect(size * 0.5, -size * 0.35, size * 0.3, size * 0.1);
+
+                // Legs
+                ctx.strokeStyle = '#ff0000';
+
+                // Left leg
+                ctx.beginPath();
+                ctx.moveTo(-size * 0.15, size * 0.2);
+                ctx.lineTo(-size * 0.2 + Math.sin(this.walkCycle) * size * 0.15, size * 0.55);
+                ctx.lineTo(-size * 0.15 + Math.sin(this.walkCycle) * size * 0.1, size * 0.9);
+                ctx.stroke();
+
+                // Right leg
+                ctx.beginPath();
+                ctx.moveTo(size * 0.15, size * 0.2);
+                ctx.lineTo(size * 0.2 - Math.sin(this.walkCycle) * size * 0.15, size * 0.55);
+                ctx.lineTo(size * 0.15 - Math.sin(this.walkCycle) * size * 0.1, size * 0.9);
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+                ctx.restore();
+            }
+
+            shatter() {
+                const p = this.project();
+                for (let i = 0; i < 25; i++) {
+                    shards.push({
+                        x: p.x + (Math.random() - 0.5) * 100,
+                        y: p.y + (Math.random() - 0.5) * 150,
+                        z: this.z,
+                        vx: (Math.random() - 0.5) * 20,
+                        vy: (Math.random() - 0.5) * 20 - 10,
+                        vz: (Math.random() - 0.5) * 10,
+                        rotation: Math.random() * Math.PI * 2,
+                        rotationSpeed: (Math.random() - 0.5) * 0.4,
+                        size: 15 + Math.random() * 25,
+                        life: 80
+                    });
+                }
+            }
+        }
+
+        // Spawn wave
+        function spawnWave() {
+            // Cap enemies at 4 max, start with 1
+            const numEnemies = Math.min(1 + Math.floor(wave / 2), 4);
+            spawningWave = true;
+            enemiesToSpawn = numEnemies;
+
+            for (let i = 0; i < numEnemies; i++) {
+                // Stagger spawn timing
+                setTimeout(() => {
+                    enemies.push(new Enemy3D(i, numEnemies));
+                    enemiesToSpawn--;
+                    if (enemiesToSpawn === 0) {
+                        spawningWave = false;
+                    }
+                }, i * 1500);
+            }
+        }
+
+        // Initialize pose and hand detection
+        async function initPoseDetection() {
+            const pose = new Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults(onPoseResults);
+
+            // Hand tracking for finger gun detection
+            const hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandResults);
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 }
+                });
+                video.srcObject = stream;
+
+                const camera = new Camera(video, {
+                    onFrame: async () => {
+                        await pose.send({ image: video });
+                        await hands.send({ image: video });
+                    },
+                    width: 1280,
+                    height: 720
+                });
+
+                camera.start();
+                statusEl.textContent = 'Pose + Hand detection ready! Point finger to shoot!';
+            } catch (err) {
+                statusEl.textContent = 'Camera error: ' + err.message;
+            }
+        }
+
+        // Hand tracking results - detect pointing finger
+        function onHandResults(results) {
+            player.leftHand = null;
+            player.rightHand = null;
+
+            // Store previous pointing state
+            player.leftWasPointing = player.leftPointing;
+            player.rightWasPointing = player.rightPointing;
+            player.leftPointing = false;
+            player.rightPointing = false;
+
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) return;
+
+            results.multiHandLandmarks.forEach((landmarks, idx) => {
+                const handedness = results.multiHandedness[idx].label;
+                const isPointing = detectPointingFinger(landmarks);
+
+                // Get index finger tip and direction
+                const indexTip = landmarks[8];
+                const indexMcp = landmarks[5];
+                const aimDir = {
+                    x: indexTip.x - indexMcp.x,
+                    y: indexTip.y - indexMcp.y
+                };
+
+                // Normalize
+                const len = Math.sqrt(aimDir.x * aimDir.x + aimDir.y * aimDir.y);
+                if (len > 0) {
+                    aimDir.x /= len;
+                    aimDir.y /= len;
+                }
+
+                // Mirror for display (video is mirrored)
+                const mirroredX = 1 - indexTip.x;
+
+                if (handedness === 'Left') {  // Appears as right hand in mirrored view
+                    player.rightHand = { ...landmarks[8], x: mirroredX };
+                    player.rightPointing = isPointing;
+                    player.rightAimDir = { x: -aimDir.x, y: aimDir.y };
+
+                    // Fire on new point gesture
+                    if (isPointing && !player.rightWasPointing && gameStarted && !gameOver) {
+                        firePlayerBullet(mirroredX, indexTip.y, player.rightAimDir);
+                    }
+                } else {  // Right hand appears as left in mirrored view
+                    player.leftHand = { ...landmarks[8], x: mirroredX };
+                    player.leftPointing = isPointing;
+                    player.leftAimDir = { x: -aimDir.x, y: aimDir.y };
+
+                    // Fire on new point gesture
+                    if (isPointing && !player.leftWasPointing && gameStarted && !gameOver) {
+                        firePlayerBullet(mirroredX, indexTip.y, player.leftAimDir);
+                    }
+                }
+            });
+        }
+
+        // Detect pointing finger gesture (index extended, others curled)
+        function detectPointingFinger(landmarks) {
+            // Finger tip and PIP indices
+            const INDEX_TIP = 8, INDEX_PIP = 6;
+            const MIDDLE_TIP = 12, MIDDLE_PIP = 10;
+            const RING_TIP = 16, RING_PIP = 14;
+            const PINKY_TIP = 20, PINKY_PIP = 18;
+
+            // Index finger must be extended (tip above PIP)
+            const indexExtended = landmarks[INDEX_TIP].y < landmarks[INDEX_PIP].y - 0.03;
+
+            // Other fingers must be curled (tip below PIP)
+            const middleCurled = landmarks[MIDDLE_TIP].y > landmarks[MIDDLE_PIP].y;
+            const ringCurled = landmarks[RING_TIP].y > landmarks[RING_PIP].y;
+            const pinkyCurled = landmarks[PINKY_TIP].y > landmarks[PINKY_PIP].y;
+
+            return indexExtended && middleCurled && ringCurled && pinkyCurled;
+        }
+
+        // Fire a player bullet
+        function firePlayerBullet(screenX, screenY, aimDir) {
+            // Convert screen position to 3D world position
+            const worldX = (screenX - 0.5) * 600;
+            const worldY = (screenY - 0.5) * 400;
+
+            // Find nearest enemy in front (positive Z) to aim at
+            let targetX = 0, targetY = 0, targetZ = 300;
+
+            if (enemies.length > 0) {
+                // Find closest enemy that's in front
+                let closestDist = Infinity;
+                enemies.forEach(enemy => {
+                    if (enemy.z > 0) { // Only target enemies in front
+                        const dist = Math.sqrt(enemy.x * enemy.x + enemy.y * enemy.y + enemy.z * enemy.z);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            targetX = enemy.x;
+                            targetY = enemy.y;
+                            targetZ = enemy.z;
+                        }
+                    }
+                });
+            }
+
+            // Always shoot forward (positive Z)
+            const dx = targetX - worldX;
+            const dy = targetY - worldY;
+            const dz = Math.max(targetZ, 100); // Ensure always shooting forward
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            // Normalize and set speed
+            const speed = 18;
+            playerBullets.push({
+                x: worldX,
+                y: worldY,
+                z: 0,
+                vx: (dx / dist) * speed,
+                vy: (dy / dist) * speed,
+                vz: Math.abs((dz / dist) * speed), // Always positive Z velocity
+                life: 150
+            });
+
+            // Create muzzle flash particles
+            createHitParticles(screenX * canvas.width, screenY * canvas.height);
+        }
+
+        // Process pose results
+        function onPoseResults(results) {
+            if (results.poseLandmarks) {
+                const landmarks = results.poseLandmarks;
+                player.landmarks = landmarks;
+
+                // Calculate body movement (focus on major body parts for significant motion)
+                if (lastPoseLandmarks) {
+                    let totalMovement = 0;
+                    player.velocity = [];
+
+                    // Key body parts for movement detection
+                    const keyParts = [
+                        POSE.NOSE, POSE.LEFT_SHOULDER, POSE.RIGHT_SHOULDER,
+                        POSE.LEFT_HIP, POSE.RIGHT_HIP, POSE.LEFT_WRIST, POSE.RIGHT_WRIST
+                    ];
+
+                    for (let i = 0; i < landmarks.length; i++) {
+                        const dx = landmarks[i].x - lastPoseLandmarks[i].x;
+                        const dy = landmarks[i].y - lastPoseLandmarks[i].y;
+                        const movement = Math.sqrt(dx*dx + dy*dy);
+
+                        // Weight key body parts more heavily
+                        if (keyParts.includes(i)) {
+                            totalMovement += movement * 2;
+                        } else {
+                            totalMovement += movement;
+                        }
+
+                        player.velocity.push({ x: dx, y: dy });
+                    }
+
+                    bodyMovement = totalMovement / landmarks.length;
+
+                    // Smooth the movement to avoid jitter
+                    smoothedMovement = smoothedMovement * 0.7 + bodyMovement * 0.3;
+                }
+
+                lastPoseLandmarks = [...landmarks];
+
+                // Update time scale - HIGH THRESHOLD required
+                // Only significant movement speeds up time
+                if (smoothedMovement > MOVEMENT_THRESHOLD) {
+                    // Scale time based on how much over threshold
+                    const movementFactor = (smoothedMovement - MOVEMENT_THRESHOLD) / MOVEMENT_THRESHOLD;
+                    timeScale = Math.min(MAX_TIME_SCALE, MIN_TIME_SCALE + movementFactor * 0.5);
+                } else {
+                    // Quickly freeze time when not moving significantly
+                    timeScale = Math.max(MIN_TIME_SCALE, timeScale * 0.8);
+                }
+            } else {
+                player.landmarks = null;
+                // Freeze time when no body detected
+                timeScale = MIN_TIME_SCALE;
+            }
+        }
+
+        // Get player center position
+        function getPlayerCenter() {
+            if (!player.landmarks) return null;
+            const hip = player.landmarks[POSE.LEFT_HIP];
+            const shoulder = player.landmarks[POSE.LEFT_SHOULDER];
+            return {
+                x: (hip.x + shoulder.x) / 2,
+                y: (hip.y + shoulder.y) / 2
+            };
+        }
+
+        // Check player bullets hitting enemies
+        function checkPlayerBulletHits() {
+            for (let i = playerBullets.length - 1; i >= 0; i--) {
+                const bullet = playerBullets[i];
+
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    const dist = Math.sqrt(
+                        (bullet.x - enemy.x) ** 2 +
+                        (bullet.y - enemy.y) ** 2 +
+                        (bullet.z - enemy.z) ** 2
+                    );
+
+                    if (dist < 100) {
+                        // Hit!
+                        enemy.shatter();
+                        enemies.splice(j, 1);
+                        playerBullets.splice(i, 1);
+                        kills++;
+                        killInfo.textContent = `KILLS: ${kills}`;
+
+                        // Freeze time briefly on kill
+                        timeScale = MIN_TIME_SCALE;
+                        break;
+                    }
+                }
+            }
+        }
+
+        function createHitParticles(x, y) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 25,
+                    vy: (Math.random() - 0.5) * 25,
+                    life: 40,
+                    color: '#ffffff'
+                });
+            }
+        }
+
+        function projectPoint(p) {
+            const scale = camera3D.fov / (camera3D.fov + p.z - camera3D.z);
+            return {
+                x: canvas.width/2 + (p.x - camera3D.x) * scale,
+                y: canvas.height/2 + (p.y - camera3D.y) * scale,
+                scale: scale
+            };
+        }
+
+        // Update game
+        function update() {
+            if (!gameStarted || gameOver) return;
+
+            const playerPos = getPlayerCenter();
+
+            // Update player bullets
+            playerBullets = playerBullets.filter(bullet => {
+                bullet.x += bullet.vx * timeScale;
+                bullet.y += bullet.vy * timeScale;
+                bullet.z += bullet.vz * timeScale;
+                bullet.life -= timeScale;
+                return bullet.life > 0 && Math.abs(bullet.x) < 1000 && Math.abs(bullet.z) < 1000;
+            });
+
+            // Check player bullets hitting enemies
+            checkPlayerBulletHits();
+
+            // Update enemies
+            enemies.forEach(e => e.update(1, playerPos));
+
+            // Update bullets
+            bullets = bullets.filter(bullet => {
+                bullet.x += bullet.vx * timeScale;
+                bullet.y += bullet.vy * timeScale;
+                bullet.z += bullet.vz * timeScale;
+
+                // Check player hit
+                if (bullet.fromEnemy && player.landmarks) {
+                    const bp = projectPoint(bullet);
+
+                    // Check against body parts
+                    const bodyParts = [POSE.NOSE, POSE.LEFT_SHOULDER, POSE.RIGHT_SHOULDER,
+                                       POSE.LEFT_HIP, POSE.RIGHT_HIP];
+                    for (const part of bodyParts) {
+                        const px = player.landmarks[part].x * canvas.width;
+                        const py = player.landmarks[part].y * canvas.height;
+                        const dist = Math.sqrt((px - bp.x)**2 + (py - bp.y)**2);
+
+                        if (dist < 50) {
+                            createHitParticles(bp.x, bp.y);
+
+                            // Only take damage if NOT in demo mode
+                            if (!demoMode) {
+                                playerHealth--;
+                                if (playerHealth <= 0) {
+                                    gameOver = true;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+
+                return Math.abs(bullet.x) < 1000 && Math.abs(bullet.z) < 1000;
+            });
+
+            // Update particles
+            particles = particles.filter(p => {
+                p.x += p.vx * timeScale;
+                p.y += p.vy * timeScale;
+                p.vy += 0.5 * timeScale;
+                p.life -= timeScale * 2;
+                return p.life > 0;
+            });
+
+            // Update shards
+            shards = shards.filter(s => {
+                s.x += s.vx * timeScale;
+                s.y += s.vy * timeScale;
+                s.vy += 0.8 * timeScale;
+                s.rotation += s.rotationSpeed * timeScale;
+                s.life -= timeScale * 2;
+                return s.life > 0;
+            });
+
+            // Check wave complete
+            if (enemies.length === 0 && !gameOver && !spawningWave) {
+                wave++;
+                waveInfo.textContent = `WAVE: ${wave}`;
+                showSuperhot();
+                spawningWave = true; // Prevent multiple triggers
+                setTimeout(() => spawnWave(), 2000);
+            }
+
+            // Update time indicator
+            if (timeScale > 0.5) {
+                timeIndicator.textContent = 'TIME: FLOWING';
+                timeIndicator.style.color = '#ff0000';
+            } else if (timeScale > 0.1) {
+                timeIndicator.textContent = 'TIME: SLOW';
+                timeIndicator.style.color = '#ff6600';
+            } else {
+                timeIndicator.textContent = 'TIME: FROZEN';
+                timeIndicator.style.color = '#666666';
+            }
+        }
+
+        function showSuperhot() {
+            superhotText.classList.add('show');
+            setTimeout(() => superhotText.classList.remove('show'), 2000);
+        }
+
+        // Draw game
+        function draw() {
+            // Clear with semi-transparent background to show video underneath
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = `rgba(255, 255, 255, ${timeScale > 0.1 ? 0.15 : 0.4})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!gameStarted) return;
+
+            // Draw 3D grid floor
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+
+            for (let z = -500; z < 500; z += 100) {
+                const p1 = projectPoint({ x: -600, y: 200, z: z });
+                const p2 = projectPoint({ x: 600, y: 200, z: z });
+                if (p1.scale > 0 && p2.scale > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+
+            for (let x = -600; x <= 600; x += 100) {
+                const p1 = projectPoint({ x: x, y: 200, z: -500 });
+                const p2 = projectPoint({ x: x, y: 200, z: 500 });
+                if (p1.scale > 0 && p2.scale > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw shards
+            shards.forEach(s => {
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(s.rotation);
+                ctx.fillStyle = `rgba(255, 0, 0, ${s.life / 80})`;
+                ctx.beginPath();
+                ctx.moveTo(0, -s.size/2);
+                ctx.lineTo(s.size/3, s.size/2);
+                ctx.lineTo(-s.size/3, s.size/2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Sort and draw enemies by Z depth
+            const sortedEnemies = [...enemies].sort((a, b) => b.z - a.z);
+            sortedEnemies.forEach(e => e.draw());
+
+            // Draw bullets
+            bullets.forEach(bullet => {
+                const p = projectPoint(bullet);
+                if (p.scale <= 0) return;
+
+                const size = 12 * p.scale;
+
+                // Trail
+                if (timeScale < 0.5) {
+                    const trailLength = 8;
+                    ctx.strokeStyle = bullet.fromEnemy ? 'rgba(255, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.6)';
+                    ctx.lineWidth = size;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    const tp = projectPoint({
+                        x: bullet.x - bullet.vx * trailLength,
+                        y: bullet.y - bullet.vy * trailLength,
+                        z: bullet.z - bullet.vz * trailLength
+                    });
+                    ctx.lineTo(tp.x, tp.y);
+                    ctx.stroke();
+                }
+
+                // Bullet
+                ctx.fillStyle = bullet.fromEnemy ? '#ff0000' : '#000000';
+                ctx.shadowColor = bullet.fromEnemy ? '#ff0000' : '#000000';
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw player bullets (cyan/green color to distinguish)
+            playerBullets.forEach(bullet => {
+                const p = projectPoint(bullet);
+                if (p.scale <= 0) return;
+
+                const size = 10 * p.scale;
+
+                // Trail
+                if (timeScale < 0.5) {
+                    const trailLength = 6;
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
+                    ctx.lineWidth = size;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    const tp = projectPoint({
+                        x: bullet.x - bullet.vx * trailLength,
+                        y: bullet.y - bullet.vy * trailLength,
+                        z: bullet.z - bullet.vz * trailLength
+                    });
+                    ctx.lineTo(tp.x, tp.y);
+                    ctx.stroke();
+                }
+
+                // Bullet
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 25;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw particles
+            particles.forEach(p => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.life / 40})`;
+                ctx.fillRect(p.x - 4, p.y - 4, 8, 8);
+            });
+
+            // Draw player body skeleton
+            if (player.landmarks) {
+                drawPlayerSkeleton();
+            }
+
+            // Draw health
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 20px Arial Black';
+            ctx.fillText('HEALTH:', 20, canvas.height - 30);
+
+            if (demoMode) {
+                // Show infinity symbol in demo mode
+                ctx.fillStyle = '#00ff00';
+                ctx.font = 'bold 30px Arial';
+                ctx.fillText('∞ DEMO', 110, canvas.height - 25);
+            } else {
+                for (let i = 0; i < 5; i++) {
+                    ctx.fillStyle = i < playerHealth ? '#ff0000' : '#ddd';
+                    ctx.fillRect(110 + i * 35, canvas.height - 45, 25, 25);
+                }
+            }
+
+            // Movement threshold indicator
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('MOVEMENT:', 20, 60);
+
+            // Movement bar
+            ctx.fillStyle = '#333';
+            ctx.fillRect(130, 47, 150, 16);
+
+            // Threshold marker
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(130 + (MOVEMENT_THRESHOLD / 0.05) * 150, 45, 2, 20);
+
+            // Current movement
+            const movementWidth = Math.min(150, (smoothedMovement / 0.05) * 150);
+            ctx.fillStyle = smoothedMovement > MOVEMENT_THRESHOLD ? '#00ff00' : '#666';
+            ctx.fillRect(130, 47, movementWidth, 16);
+
+            ctx.fillStyle = '#000';
+            ctx.fillText(smoothedMovement > MOVEMENT_THRESHOLD ? 'TIME FLOWING' : 'TIME FROZEN', 290, 60);
+
+            // Game over
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 80px Arial Black';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 40);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 40px Arial Black';
+                ctx.fillText(`KILLS: ${kills}`, canvas.width/2, canvas.height/2 + 30);
+                ctx.fillText('Refresh to restart', canvas.width/2, canvas.height/2 + 90);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // Draw player skeleton with tracking visualization
+        function drawPlayerSkeleton() {
+            const landmarks = player.landmarks;
+
+            // Scale landmarks to canvas
+            const scale = (lm) => ({
+                x: lm.x * canvas.width,
+                y: lm.y * canvas.height
+            });
+
+            // Color based on movement state
+            const isMoving = smoothedMovement > MOVEMENT_THRESHOLD;
+            const bodyColor = isMoving ? '#00ff00' : '#00aaff';
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Draw connections
+            BODY_CONNECTIONS.forEach(([a, b]) => {
+                const p1 = scale(landmarks[a]);
+                const p2 = scale(landmarks[b]);
+
+                // Glow
+                ctx.shadowColor = bodyColor;
+                ctx.shadowBlur = 15;
+                ctx.strokeStyle = bodyColor;
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            });
+
+            ctx.shadowBlur = 0;
+
+            // Draw joints
+            const importantJoints = [
+                POSE.NOSE, POSE.LEFT_SHOULDER, POSE.RIGHT_SHOULDER,
+                POSE.LEFT_ELBOW, POSE.RIGHT_ELBOW, POSE.LEFT_WRIST, POSE.RIGHT_WRIST,
+                POSE.LEFT_HIP, POSE.RIGHT_HIP, POSE.LEFT_KNEE, POSE.RIGHT_KNEE,
+                POSE.LEFT_ANKLE, POSE.RIGHT_ANKLE
+            ];
+
+            importantJoints.forEach(idx => {
+                const p = scale(landmarks[idx]);
+                let radius = 8;
+
+                if (idx === POSE.NOSE) radius = 15;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = bodyColor;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw finger gun indicators and aim lines
+            if (player.rightHand) {
+                const handX = player.rightHand.x * canvas.width;
+                const handY = player.rightHand.y * canvas.height;
+
+                // Draw hand marker
+                ctx.beginPath();
+                ctx.arc(handX, handY, player.rightPointing ? 20 : 12, 0, Math.PI * 2);
+                ctx.fillStyle = player.rightPointing ? '#00ff00' : '#ffff00';
+                ctx.shadowColor = player.rightPointing ? '#00ff00' : '#ffff00';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw aim line when pointing
+                if (player.rightPointing) {
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(handX, handY);
+                    ctx.lineTo(handX + player.rightAimDir.x * 200, handY + player.rightAimDir.y * 200);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // "READY" text
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillText('FIRE!', handX + 25, handY - 10);
+                }
+            }
+
+            if (player.leftHand) {
+                const handX = player.leftHand.x * canvas.width;
+                const handY = player.leftHand.y * canvas.height;
+
+                // Draw hand marker
+                ctx.beginPath();
+                ctx.arc(handX, handY, player.leftPointing ? 20 : 12, 0, Math.PI * 2);
+                ctx.fillStyle = player.leftPointing ? '#00ff00' : '#ffff00';
+                ctx.shadowColor = player.leftPointing ? '#00ff00' : '#ffff00';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw aim line when pointing
+                if (player.leftPointing) {
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(handX, handY);
+                    ctx.lineTo(handX + player.leftAimDir.x * 200, handY + player.leftAimDir.y * 200);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // "FIRE!" text
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillText('FIRE!', handX + 25, handY - 10);
+                }
+            }
+
+            // Info panel
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 80, 200, 120);
+            ctx.strokeStyle = bodyColor;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 80, 200, 120);
+
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.fillText('BODY TRACKING', 20, 100);
+
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText(`Movement: ${(smoothedMovement * 1000).toFixed(1)}`, 20, 120);
+            ctx.fillText(`Threshold: ${(MOVEMENT_THRESHOLD * 1000).toFixed(1)}`, 20, 138);
+            ctx.fillText(`Time: ${(timeScale * 100).toFixed(0)}%`, 20, 156);
+
+            // Time bar
+            ctx.fillStyle = '#333';
+            ctx.fillRect(65, 148, 120, 10);
+            ctx.fillStyle = isMoving ? '#00ff00' : '#666';
+            ctx.fillRect(65, 148, 120 * timeScale, 10);
+
+            ctx.fillStyle = isMoving ? '#00ff00' : '#888';
+            ctx.fillText(`Status: ${isMoving ? 'MOVING' : 'FROZEN'}`, 20, 174);
+
+            // Shooting info
+            const pointing = player.leftPointing || player.rightPointing;
+            ctx.fillStyle = pointing ? '#00ff00' : '#666';
+            ctx.fillText(`Finger Gun: ${pointing ? 'FIRING!' : 'not pointing'}`, 20, 192);
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Demo mode toggle
+        demoToggle.addEventListener('click', () => {
+            demoMode = !demoMode;
+            demoToggle.textContent = `DEMO MODE: ${demoMode ? 'ON' : 'OFF'}`;
+            demoToggle.classList.toggle('active', demoMode);
+        });
+
+        // Initialize demo toggle state
+        demoToggle.textContent = `DEMO MODE: ${demoMode ? 'ON' : 'OFF'}`;
+        demoToggle.classList.toggle('active', demoMode);
+
+        // Start
+        startBtn.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+            gameStarted = true;
+
+            // Show demo indicator if in demo mode
+            if (demoMode) {
+                demoIndicator.classList.add('show');
+            }
+
+            spawnWave();
+            showSuperhot();
+        });
+
+        initPoseDetection();
+        gameLoop();
+    </script>
+</body>
+</html>

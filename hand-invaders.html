@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Invaders</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #container {
+            position: relative;
+        }
+
+        #gameCanvas {
+            border: 2px solid #0f0;
+            display: block;
+        }
+
+        #videoContainer {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            border: 2px solid #0f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #webcam {
+            width: 160px;
+            height: 120px;
+            transform: scaleX(-1);
+            display: block;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            z-index: 10;
+        }
+
+        #overlay h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #0f0;
+        }
+
+        #overlay p {
+            font-size: 18px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        #startBtn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 24px;
+            background: transparent;
+            border: 2px solid #0f0;
+            color: #0f0;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        #startBtn:hover {
+            background: #0f0;
+            color: #000;
+        }
+
+        #status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #0f0;
+            font-size: 14px;
+        }
+
+        #gestureIndicator {
+            position: absolute;
+            top: 10px;
+            right: 180px;
+            color: #ff0;
+            font-size: 24px;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <div id="videoContainer">
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+
+        <div id="status">Initializing camera...</div>
+        <div id="gestureIndicator">😉 FIRE!</div>
+
+        <div id="overlay">
+            <h1>🛸 HAND INVADERS 🛸</h1>
+            <p>Move your hand LEFT/RIGHT to control the ship</p>
+            <p>WINK or close an eye 😉 to shoot!</p>
+            <p>Destroy all invaders to win!</p>
+            <button id="startBtn">START GAME</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+    <script>
+        // Game Constants
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const PLAYER_WIDTH = 50;
+        const PLAYER_HEIGHT = 30;
+        const INVADER_ROWS = 4;
+        const INVADER_COLS = 8;
+        const INVADER_WIDTH = 40;
+        const INVADER_HEIGHT = 30;
+        const INVADER_PADDING = 15;
+        const BULLET_WIDTH = 4;
+        const BULLET_HEIGHT = 15;
+        const BULLET_SPEED = 8;
+        const INVADER_BULLET_SPEED = 4;
+        const SHOOT_COOLDOWN = 300;
+
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('webcam');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
+        const statusEl = document.getElementById('status');
+        const gestureIndicator = document.getElementById('gestureIndicator');
+
+        // Game State
+        let gameRunning = false;
+        let gameOver = false;
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let handX = CANVAS_WIDTH / 2;
+        let isWinking = false;
+        let lastShootTime = 0;
+        let handDetected = false;
+        let faceDetected = false;
+
+        // Game Objects
+        let player = {
+            x: CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2,
+            y: CANVAS_HEIGHT - 60,
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT
+        };
+
+        let bullets = [];
+        let invaderBullets = [];
+        let invaders = [];
+        let particles = [];
+        let invaderDirection = 1;
+        let invaderSpeed = 1;
+
+        // Initialize Invaders
+        function initInvaders() {
+            invaders = [];
+            const startX = (CANVAS_WIDTH - (INVADER_COLS * (INVADER_WIDTH + INVADER_PADDING))) / 2;
+            const startY = 60;
+
+            for (let row = 0; row < INVADER_ROWS; row++) {
+                for (let col = 0; col < INVADER_COLS; col++) {
+                    invaders.push({
+                        x: startX + col * (INVADER_WIDTH + INVADER_PADDING),
+                        y: startY + row * (INVADER_HEIGHT + INVADER_PADDING),
+                        width: INVADER_WIDTH,
+                        height: INVADER_HEIGHT,
+                        type: row < 2 ? 'strong' : 'weak',
+                        frame: 0
+                    });
+                }
+            }
+            invaderSpeed = 1 + (level - 1) * 0.5;
+        }
+
+        // MediaPipe Hands Setup
+        async function initHandTracking() {
+            const hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandResults);
+
+            // Face Mesh for eye tracking
+            const faceMesh = new FaceMesh({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                }
+            });
+
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            faceMesh.onResults(onFaceResults);
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                const camera = new Camera(video, {
+                    onFrame: async () => {
+                        await hands.send({ image: video });
+                        await faceMesh.send({ image: video });
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                camera.start();
+                statusEl.textContent = 'Hand + Face tracking ready!';
+                statusEl.style.color = '#0f0';
+            } catch (err) {
+                statusEl.textContent = 'Camera error: ' + err.message;
+                statusEl.style.color = '#f00';
+            }
+        }
+
+        // Process hand tracking results
+        function onHandResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                handDetected = true;
+                const landmarks = results.multiHandLandmarks[0];
+
+                // Get wrist position for horizontal movement (mirrored)
+                const wrist = landmarks[0];
+                handX = (1 - wrist.x) * CANVAS_WIDTH;
+            } else {
+                handDetected = false;
+            }
+            updateStatus();
+        }
+
+        // Process face tracking results
+        function onFaceResults(results) {
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                faceDetected = true;
+                const landmarks = results.multiFaceLandmarks[0];
+
+                // Detect wink/eye close
+                isWinking = detectWink(landmarks);
+
+                // Update gesture indicator
+                gestureIndicator.style.opacity = isWinking ? '1' : '0';
+            } else {
+                faceDetected = false;
+                isWinking = false;
+                gestureIndicator.style.opacity = '0';
+            }
+            updateStatus();
+        }
+
+        // Update status text
+        function updateStatus() {
+            if (!handDetected && !faceDetected) {
+                statusEl.textContent = 'Show your hand and face';
+            } else if (!handDetected) {
+                statusEl.textContent = 'Show your hand to move';
+            } else if (!faceDetected) {
+                statusEl.textContent = 'Show your face to shoot';
+            } else {
+                statusEl.textContent = `Ready! ${isWinking ? '😉 SHOOTING!' : 'Wink to shoot'}`;
+            }
+        }
+
+        // Detect wink or eye close
+        function detectWink(landmarks) {
+            // Eye landmarks for MediaPipe Face Mesh
+            // Right eye (from camera's perspective, user's left eye)
+            const rightEyeUpper = [159, 145]; // upper and lower eyelid
+            const rightEyeLower = [145, 159];
+
+            // Left eye (from camera's perspective, user's right eye)
+            const leftEyeUpper = [386, 374];
+            const leftEyeLower = [374, 386];
+
+            // Calculate eye aspect ratio (EAR) for each eye
+            // Using vertical distance between upper and lower eyelid
+
+            // Right eye vertical distance
+            const rightEyeTop = landmarks[159];
+            const rightEyeBottom = landmarks[145];
+            const rightEyeHeight = Math.abs(rightEyeTop.y - rightEyeBottom.y);
+
+            // Left eye vertical distance
+            const leftEyeTop = landmarks[386];
+            const leftEyeBottom = landmarks[374];
+            const leftEyeHeight = Math.abs(leftEyeTop.y - leftEyeBottom.y);
+
+            // Eye width for normalization
+            const rightEyeInner = landmarks[133];
+            const rightEyeOuter = landmarks[33];
+            const rightEyeWidth = Math.abs(rightEyeOuter.x - rightEyeInner.x);
+
+            const leftEyeInner = landmarks[362];
+            const leftEyeOuter = landmarks[263];
+            const leftEyeWidth = Math.abs(leftEyeOuter.x - leftEyeInner.x);
+
+            // Calculate aspect ratios
+            const rightEAR = rightEyeHeight / (rightEyeWidth + 0.001);
+            const leftEAR = leftEyeHeight / (leftEyeWidth + 0.001);
+
+            // Threshold for closed eye (lower = more closed)
+            const EAR_THRESHOLD = 0.15;
+
+            // Detect if either eye is closed (wink) or both (blink)
+            const rightEyeClosed = rightEAR < EAR_THRESHOLD;
+            const leftEyeClosed = leftEAR < EAR_THRESHOLD;
+
+            // Return true if at least one eye is closed
+            return rightEyeClosed || leftEyeClosed;
+        }
+
+        // Thumbs up detection
+        function detectThumbsUp(landmarks) {
+            // Landmark indices
+            const THUMB_TIP = 4;
+            const THUMB_IP = 3;
+            const THUMB_MCP = 2;
+            const INDEX_TIP = 8;
+            const INDEX_PIP = 6;
+            const MIDDLE_TIP = 12;
+            const MIDDLE_PIP = 10;
+            const RING_TIP = 16;
+            const RING_PIP = 14;
+            const PINKY_TIP = 20;
+            const PINKY_PIP = 18;
+            const WRIST = 0;
+
+            const thumb = landmarks[THUMB_TIP];
+            const thumbBase = landmarks[THUMB_MCP];
+            const wrist = landmarks[WRIST];
+
+            // Check if thumb is extended upward
+            const thumbUp = thumb.y < thumbBase.y - 0.05;
+
+            // Check if thumb is above other fingers
+            const thumbAboveIndex = thumb.y < landmarks[INDEX_TIP].y;
+            const thumbAboveMiddle = thumb.y < landmarks[MIDDLE_TIP].y;
+
+            // Check if other fingers are curled (tips below their PIP joints)
+            const indexCurled = landmarks[INDEX_TIP].y > landmarks[INDEX_PIP].y;
+            const middleCurled = landmarks[MIDDLE_TIP].y > landmarks[MIDDLE_PIP].y;
+            const ringCurled = landmarks[RING_TIP].y > landmarks[RING_PIP].y;
+            const pinkyCurled = landmarks[PINKY_TIP].y > landmarks[PINKY_PIP].y;
+
+            // Thumbs up = thumb extended up + other fingers curled
+            return thumbUp && thumbAboveIndex && thumbAboveMiddle &&
+                   indexCurled && middleCurled && ringCurled && pinkyCurled;
+        }
+
+        // Create explosion particles
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 30,
+                    color: color
+                });
+            }
+        }
+
+        // Shoot bullet
+        function shoot() {
+            const now = Date.now();
+            if (now - lastShootTime > SHOOT_COOLDOWN) {
+                bullets.push({
+                    x: player.x + player.width / 2 - BULLET_WIDTH / 2,
+                    y: player.y,
+                    width: BULLET_WIDTH,
+                    height: BULLET_HEIGHT
+                });
+                lastShootTime = now;
+            }
+        }
+
+        // Invader shooting
+        function invaderShoot() {
+            if (invaders.length === 0) return;
+            if (Math.random() < 0.02 * level) {
+                const shooter = invaders[Math.floor(Math.random() * invaders.length)];
+                invaderBullets.push({
+                    x: shooter.x + shooter.width / 2 - BULLET_WIDTH / 2,
+                    y: shooter.y + shooter.height,
+                    width: BULLET_WIDTH,
+                    height: BULLET_HEIGHT
+                });
+            }
+        }
+
+        // Collision detection
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        // Update game state
+        function update() {
+            if (!gameRunning || gameOver) return;
+
+            // Update player position based on hand
+            if (handDetected) {
+                const targetX = handX - player.width / 2;
+                player.x += (targetX - player.x) * 0.15;
+                player.x = Math.max(0, Math.min(CANVAS_WIDTH - player.width, player.x));
+            }
+
+            // Shoot if winking
+            if (isWinking && handDetected) {
+                shoot();
+            }
+
+            // Update bullets
+            bullets = bullets.filter(bullet => {
+                bullet.y -= BULLET_SPEED;
+                return bullet.y > -bullet.height;
+            });
+
+            // Update invader bullets
+            invaderBullets = invaderBullets.filter(bullet => {
+                bullet.y += INVADER_BULLET_SPEED;
+                return bullet.y < CANVAS_HEIGHT;
+            });
+
+            // Update invaders
+            let hitEdge = false;
+            invaders.forEach(invader => {
+                invader.x += invaderDirection * invaderSpeed;
+                invader.frame = (invader.frame + 0.05) % 2;
+
+                if (invader.x <= 0 || invader.x + invader.width >= CANVAS_WIDTH) {
+                    hitEdge = true;
+                }
+            });
+
+            if (hitEdge) {
+                invaderDirection *= -1;
+                invaders.forEach(invader => {
+                    invader.y += 20;
+                    if (invader.y + invader.height >= player.y) {
+                        gameOver = true;
+                    }
+                });
+            }
+
+            // Invader shooting
+            invaderShoot();
+
+            // Check bullet-invader collisions
+            bullets.forEach((bullet, bi) => {
+                invaders.forEach((invader, ii) => {
+                    if (checkCollision(bullet, invader)) {
+                        createExplosion(invader.x + invader.width/2, invader.y + invader.height/2, '#0f0');
+                        invaders.splice(ii, 1);
+                        bullets.splice(bi, 1);
+                        score += invader.type === 'strong' ? 20 : 10;
+                    }
+                });
+            });
+
+            // Check invader bullet-player collisions
+            invaderBullets.forEach((bullet, bi) => {
+                if (checkCollision(bullet, player)) {
+                    createExplosion(player.x + player.width/2, player.y + player.height/2, '#f00');
+                    invaderBullets.splice(bi, 1);
+                    lives--;
+                    if (lives <= 0) {
+                        gameOver = true;
+                    }
+                }
+            });
+
+            // Update particles
+            particles = particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                return p.life > 0;
+            });
+
+            // Check win condition
+            if (invaders.length === 0) {
+                level++;
+                initInvaders();
+            }
+        }
+
+        // Draw game
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Draw stars background
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 47) % CANVAS_WIDTH;
+                const y = (i * 31 + Date.now() * 0.02) % CANVAS_HEIGHT;
+                ctx.fillRect(x, y, 1, 1);
+            }
+
+            if (gameRunning && !gameOver) {
+                // Draw player
+                ctx.fillStyle = '#0f0';
+                ctx.beginPath();
+                ctx.moveTo(player.x + player.width / 2, player.y);
+                ctx.lineTo(player.x, player.y + player.height);
+                ctx.lineTo(player.x + player.width, player.y + player.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw player glow
+                ctx.shadowColor = '#0f0';
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw bullets
+                ctx.fillStyle = '#0ff';
+                bullets.forEach(bullet => {
+                    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                });
+
+                // Draw invader bullets
+                ctx.fillStyle = '#f00';
+                invaderBullets.forEach(bullet => {
+                    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                });
+
+                // Draw invaders
+                invaders.forEach(invader => {
+                    const color = invader.type === 'strong' ? '#f0f' : '#ff0';
+                    ctx.fillStyle = color;
+
+                    // Simple alien shape
+                    const offset = Math.floor(invader.frame) * 2;
+                    ctx.fillRect(invader.x + 5, invader.y, invader.width - 10, invader.height - 10);
+                    ctx.fillRect(invader.x, invader.y + 10, invader.width, invader.height - 15);
+                    ctx.fillRect(invader.x + 5 - offset, invader.y + invader.height - 10, 8, 10);
+                    ctx.fillRect(invader.x + invader.width - 13 + offset, invader.y + invader.height - 10, 8, 10);
+
+                    // Eyes
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(invader.x + 10, invader.y + 12, 5, 5);
+                    ctx.fillRect(invader.x + invader.width - 15, invader.y + 12, 5, 5);
+                });
+
+                // Draw particles
+                particles.forEach(p => {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life / 30;
+                    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+                });
+                ctx.globalAlpha = 1;
+
+                // Draw hand position indicator
+                if (handDetected) {
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(handX, 0);
+                    ctx.lineTo(handX, CANVAS_HEIGHT);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Draw UI
+                ctx.fillStyle = '#0f0';
+                ctx.font = '20px Courier New';
+                ctx.fillText(`SCORE: ${score}`, 20, 30);
+                ctx.fillText(`LIVES: ${'♥'.repeat(lives)}`, 20, 55);
+                ctx.fillText(`LEVEL: ${level}`, CANVAS_WIDTH - 120, 30);
+            }
+
+            // Game over screen
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                ctx.fillStyle = '#f00';
+                ctx.font = '48px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30);
+
+                ctx.fillStyle = '#0f0';
+                ctx.font = '24px Courier New';
+                ctx.fillText(`Final Score: ${score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+                ctx.fillText('Wink to restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60);
+                ctx.textAlign = 'left';
+
+                // Restart with wink
+                if (isWinking) {
+                    resetGame();
+                }
+            }
+        }
+
+        // Reset game
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            level = 1;
+            gameOver = false;
+            bullets = [];
+            invaderBullets = [];
+            particles = [];
+            player.x = CANVAS_WIDTH / 2 - PLAYER_WIDTH / 2;
+            initInvaders();
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        startBtn.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+            gameRunning = true;
+            resetGame();
+        });
+
+        // Initialize
+        initHandTracking();
+        gameLoop();
+    </script>
+</body>
+</html>
