@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaPipe Vibes - Gesture Controlled Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #00d9ff, #ff00d9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .tech-badges {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+        }
+
+        .game-card.invaders { --accent: #00ff00; --accent2: #00aa00; }
+        .game-card.roulette { --accent: #ff0000; --accent2: #aa0000; }
+        .game-card.superhot { --accent: #ff0000; --accent2: #ff6600; }
+        .game-card.superhot-body { --accent: #00ffff; --accent2: #ff00ff; }
+
+        .game-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .game-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .game-description {
+            color: #888;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .game-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .play-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 25px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.85rem;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #666;
+        }
+
+        footer a {
+            color: #00d9ff;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .requirements {
+            background: rgba(255, 200, 0, 0.1);
+            border: 1px solid rgba(255, 200, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 40px;
+            text-align: center;
+            color: #ffcc00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MediaPipe Vibes</h1>
+            <p class="subtitle">Gesture-controlled games using your webcam</p>
+            <div class="tech-badges">
+                <span class="badge">MediaPipe Hands</span>
+                <span class="badge">MediaPipe Pose</span>
+                <span class="badge">MediaPipe Face Mesh</span>
+                <span class="badge">No Install Required</span>
+            </div>
+        </header>
+
+        <div class="requirements">
+            Requires webcam access. Works best in Chrome/Edge. Stand back so your body is visible!
+        </div>
+
+        <div class="games-grid">
+            <a href="hand-invaders.html" class="game-card invaders">
+                <div class="game-icon">👾</div>
+                <div class="game-title">Hand Invaders</div>
+                <p class="game-description">
+                    Classic Space Invaders with a twist! Move your hand left/right to control the ship.
+                    Wink your eye to shoot down the alien invaders.
+                </p>
+                <div class="game-controls">
+                    <span class="control-tag">✋ Hand Position</span>
+                    <span class="control-tag">😉 Wink to Shoot</span>
+                </div>
+                <span class="play-btn">Play Now</span>
+            </a>
+
+            <a href="russian-roulette.html" class="game-card roulette">
+                <div class="game-icon">🔫</div>
+                <div class="game-title">Russian Roulette</div>
+                <p class="game-description">
+                    A tense game of chance. Make a finger gun gesture, load with your palm,
+                    then point at your head to pull the trigger. 1 in 6 chance...
+                </p>
+                <div class="game-controls">
+                    <span class="control-tag">👉 Gun Gesture</span>
+                    <span class="control-tag">✋ Palm to Load</span>
+                    <span class="control-tag">🎯 Head Tracking</span>
+                </div>
+                <span class="play-btn">Play Now</span>
+            </a>
+
+            <a href="superhot.html" class="game-card superhot">
+                <div class="game-icon">🔥</div>
+                <div class="game-title">SUPER HOT (Hands)</div>
+                <p class="game-description">
+                    Time moves only when you move! Use your hands to control time flow.
+                    Make a fist to punch enemies. Dodge bullets in slow motion.
+                </p>
+                <div class="game-controls">
+                    <span class="control-tag">✋ Move = Time Flows</span>
+                    <span class="control-tag">👊 Fist to Punch</span>
+                </div>
+                <span class="play-btn">Play Now</span>
+            </a>
+
+            <a href="superhot-body.html" class="game-card superhot-body">
+                <div class="game-icon">🦸</div>
+                <div class="game-title">SUPER HOT (Full Body)</div>
+                <p class="game-description">
+                    Full body SUPERHOT experience! Your whole body controls time.
+                    Point your finger like a gun to shoot enemies. Dodge with your body.
+                </p>
+                <div class="game-controls">
+                    <span class="control-tag">🧍 Body = Time</span>
+                    <span class="control-tag">👉 Finger Gun</span>
+                    <span class="control-tag">🎥 Video Overlay</span>
+                </div>
+                <span class="play-btn">Play Now</span>
+            </a>
+        </div>
+
+        <footer>
+            <p>Built with MediaPipe & Canvas | <a href="https://github.com/Van0SS/mediapipe-vibes">View on GitHub</a></p>
+        </footer>
+    </div>
+</body>
+</html>
