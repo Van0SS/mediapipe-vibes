@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mars Terraforming - Idle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a0a0a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Mars visualization */
+        #marsView {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #000 0%, #1a0505 50%, #2a1010 100%);
+            overflow: hidden;
+        }
+
+        #stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #mars {
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #d4734a 0%, #a63c2a 40%, #6b2518 80%, #3a1008 100%);
+            box-shadow:
+                inset -30px -30px 60px rgba(0,0,0,0.6),
+                0 0 80px rgba(255, 100, 50, 0.3);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.5s ease;
+        }
+
+        #mars:hover {
+            transform: scale(1.02);
+        }
+
+        #mars:active {
+            transform: scale(0.98);
+        }
+
+        .mars-surface {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .crater {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Atmosphere overlay */
+        #atmosphere {
+            position: absolute;
+            width: 440px;
+            height: 440px;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: all 1s ease;
+        }
+
+        /* Water overlay */
+        #water {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .ocean {
+            position: absolute;
+            background: rgba(30, 100, 200, 0.6);
+            border-radius: 40%;
+            transition: all 0.5s ease;
+        }
+
+        /* Vegetation overlay */
+        #vegetation {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .forest {
+            position: absolute;
+            background: rgba(34, 139, 34, 0.7);
+            border-radius: 30%;
+            transition: all 0.5s ease;
+        }
+
+        /* Stats display */
+        #terraformStats {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,100,50,0.3);
+        }
+
+        .stat-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stat-icon {
+            width: 30px;
+            font-size: 1.2rem;
+        }
+
+        .stat-bar-container {
+            flex: 1;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 0 10px;
+            min-width: 150px;
+        }
+
+        .stat-bar {
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .stat-bar.temp { background: linear-gradient(90deg, #3498db, #e74c3c); }
+        .stat-bar.oxygen { background: linear-gradient(90deg, #95a5a6, #3498db); }
+        .stat-bar.water { background: linear-gradient(90deg, #85c1e9, #2980b9); }
+        .stat-bar.vegetation { background: linear-gradient(90deg, #82e0aa, #27ae60); }
+
+        .stat-value {
+            min-width: 50px;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        /* Click feedback */
+        .click-particle {
+            position: absolute;
+            pointer-events: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            animation: floatUp 1s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+        }
+
+        /* Side panel */
+        #sidePanel {
+            width: 350px;
+            background: rgba(20, 10, 10, 0.95);
+            border-left: 1px solid rgba(255, 100, 50, 0.2);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #sidePanel h2 {
+            color: #ff6b4a;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 1px solid rgba(255, 100, 50, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .resource-display {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .resource-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .resource-name {
+            color: #aaa;
+        }
+
+        .resource-value {
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .resource-rate {
+            color: #4a4;
+            font-size: 0.85rem;
+        }
+
+        /* Buildings */
+        .building-section {
+            margin-bottom: 20px;
+        }
+
+        .building-section h3 {
+            color: #ccc;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .building-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .building-card:hover:not(.disabled) {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255, 100, 50, 0.5);
+        }
+
+        .building-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .building-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .building-name {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .building-count {
+            background: rgba(255, 100, 50, 0.3);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .building-cost {
+            color: #f9ca24;
+            font-size: 0.9rem;
+        }
+
+        .building-effect {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        /* Milestones */
+        #milestones {
+            margin-top: 20px;
+        }
+
+        .milestone {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .milestone.achieved {
+            background: rgba(46, 204, 113, 0.1);
+            border-color: rgba(46, 204, 113, 0.3);
+        }
+
+        .milestone-icon {
+            font-size: 1.5rem;
+        }
+
+        .milestone-text {
+            flex: 1;
+        }
+
+        .milestone-name {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .milestone-desc {
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        /* Progress to habitable */
+        #habitableProgress {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 370px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,100,50,0.3);
+        }
+
+        #habitableProgress h3 {
+            margin-bottom: 10px;
+            color: #ff6b4a;
+        }
+
+        #habitableBar {
+            height: 25px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        #habitableFill {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* Victory screen */
+        #victoryScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        #victoryScreen.show {
+            display: flex;
+        }
+
+        #victoryScreen h1 {
+            font-size: 4rem;
+            color: #2ecc71;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(46, 204, 113, 0.5);
+        }
+
+        #victoryScreen p {
+            font-size: 1.5rem;
+            color: #888;
+        }
+
+        #newEarth {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%,
+                #87CEEB 0%,
+                #4a9eff 20%,
+                #228B22 40%,
+                #2ecc71 60%,
+                #1a8a4c 80%);
+            box-shadow:
+                inset -20px -20px 40px rgba(0,0,0,0.3),
+                0 0 100px rgba(46, 204, 113, 0.5);
+            margin: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="marsView">
+            <canvas id="stars"></canvas>
+            <div id="atmosphere"></div>
+            <div id="mars">
+                <div class="mars-surface">
+                    <div id="water"></div>
+                    <div id="vegetation"></div>
+                </div>
+            </div>
+
+            <div id="terraformStats">
+                <div class="stat-row">
+                    <span class="stat-icon">🌡️</span>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar temp" id="tempBar"></div>
+                    </div>
+                    <span class="stat-value" id="tempValue">-60°C</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-icon">💨</span>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar oxygen" id="oxygenBar"></div>
+                    </div>
+                    <span class="stat-value" id="oxygenValue">0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-icon">💧</span>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar water" id="waterBar"></div>
+                    </div>
+                    <span class="stat-value" id="waterValue">0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-icon">🌿</span>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar vegetation" id="vegBar"></div>
+                    </div>
+                    <span class="stat-value" id="vegValue">0%</span>
+                </div>
+            </div>
+
+            <div id="habitableProgress">
+                <h3>Terraforming Progress</h3>
+                <div id="habitableBar">
+                    <div id="habitableFill">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sidePanel">
+            <h2>Mission Control</h2>
+
+            <div class="resource-display">
+                <div class="resource-row">
+                    <span class="resource-name">Credits</span>
+                    <span>
+                        <span class="resource-value" id="creditsValue">0</span>
+                        <span class="resource-rate" id="creditsRate"></span>
+                    </span>
+                </div>
+                <div class="resource-row">
+                    <span class="resource-name">Research</span>
+                    <span>
+                        <span class="resource-value" id="researchValue">0</span>
+                        <span class="resource-rate" id="researchRate"></span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="building-section">
+                <h3>Infrastructure</h3>
+                <div id="buildingsList"></div>
+            </div>
+
+            <div id="milestones">
+                <h3 style="color: #ccc; margin-bottom: 10px;">Milestones</h3>
+                <div id="milestonesList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="victoryScreen">
+        <h1>MARS TERRAFORMED!</h1>
+        <div id="newEarth"></div>
+        <p>Humanity's new home is ready</p>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            credits: 50,
+            research: 0,
+            creditsPerSecond: 0,
+            researchPerSecond: 0,
+            creditsPerClick: 1,
+
+            // Terraform levels (0-100)
+            temperature: 0,      // -60°C to 15°C
+            oxygen: 0,           // 0% to 21%
+            water: 0,            // 0% to 70% coverage
+            vegetation: 0,       // 0% to 30% coverage
+
+            buildings: {},
+            milestones: {},
+            gameWon: false
+        };
+
+        // Buildings data
+        const buildings = [
+            {
+                id: 'solar',
+                name: 'Solar Array',
+                icon: '☀️',
+                baseCost: 50,
+                costMultiplier: 1.15,
+                effect: { creditsPerSecond: 1 },
+                description: '+1 credit/sec'
+            },
+            {
+                id: 'miner',
+                name: 'Mining Drone',
+                icon: '⛏️',
+                baseCost: 200,
+                costMultiplier: 1.18,
+                effect: { creditsPerSecond: 5, creditsPerClick: 1 },
+                description: '+5 credits/sec, +1 per click'
+            },
+            {
+                id: 'lab',
+                name: 'Research Lab',
+                icon: '🔬',
+                baseCost: 500,
+                costMultiplier: 1.2,
+                effect: { researchPerSecond: 1 },
+                description: '+1 research/sec'
+            },
+            {
+                id: 'greenhouse',
+                name: 'Greenhouse',
+                icon: '🌱',
+                baseCost: 1000,
+                costMultiplier: 1.25,
+                requires: { temperature: 10 },
+                effect: { vegetation: 0.5, oxygen: 0.1 },
+                description: '+0.5 vegetation, +0.1 oxygen per sec'
+            },
+            {
+                id: 'heater',
+                name: 'Orbital Mirror',
+                icon: '🛰️',
+                baseCost: 800,
+                costMultiplier: 1.2,
+                effect: { temperature: 0.3 },
+                description: '+0.3 temperature/sec'
+            },
+            {
+                id: 'factory',
+                name: 'Atmosphere Factory',
+                icon: '🏭',
+                baseCost: 2000,
+                costMultiplier: 1.22,
+                requires: { temperature: 20 },
+                effect: { oxygen: 0.3, temperature: 0.1 },
+                description: '+0.3 oxygen, +0.1 temp per sec'
+            },
+            {
+                id: 'comet',
+                name: 'Comet Catcher',
+                icon: '☄️',
+                baseCost: 5000,
+                costMultiplier: 1.25,
+                requires: { research: 100 },
+                effect: { water: 0.5 },
+                description: '+0.5 water/sec'
+            },
+            {
+                id: 'algae',
+                name: 'Algae Farm',
+                icon: '🦠',
+                baseCost: 3000,
+                costMultiplier: 1.2,
+                requires: { water: 10, temperature: 15 },
+                effect: { oxygen: 0.5, vegetation: 0.2 },
+                description: '+0.5 oxygen, +0.2 vegetation per sec'
+            },
+            {
+                id: 'forest',
+                name: 'Forest Dome',
+                icon: '🌲',
+                baseCost: 10000,
+                costMultiplier: 1.3,
+                requires: { oxygen: 10, water: 20 },
+                effect: { vegetation: 1, oxygen: 0.3 },
+                description: '+1 vegetation, +0.3 oxygen per sec'
+            },
+            {
+                id: 'ocean',
+                name: 'Ocean Generator',
+                icon: '🌊',
+                baseCost: 25000,
+                costMultiplier: 1.35,
+                requires: { water: 30, temperature: 40 },
+                effect: { water: 2, temperature: 0.2 },
+                description: '+2 water, +0.2 temp per sec'
+            }
+        ];
+
+        // Milestones
+        const milestones = [
+            { id: 'first_heat', name: 'First Warmth', desc: 'Reach 10% temperature', check: () => gameState.temperature >= 10, reward: { credits: 500 } },
+            { id: 'breathable', name: 'First Breath', desc: 'Reach 10% oxygen', check: () => gameState.oxygen >= 10, reward: { credits: 1000 } },
+            { id: 'first_water', name: 'First Lakes', desc: 'Reach 10% water', check: () => gameState.water >= 10, reward: { credits: 1000 } },
+            { id: 'first_plants', name: 'First Growth', desc: 'Reach 10% vegetation', check: () => gameState.vegetation >= 10, reward: { credits: 1500 } },
+            { id: 'warm', name: 'Above Freezing', desc: 'Reach 50% temperature', check: () => gameState.temperature >= 50, reward: { credits: 5000 } },
+            { id: 'half_air', name: 'Breathable Air', desc: 'Reach 50% oxygen', check: () => gameState.oxygen >= 50, reward: { credits: 5000 } },
+            { id: 'oceans', name: 'Oceans Form', desc: 'Reach 50% water', check: () => gameState.water >= 50, reward: { credits: 5000 } },
+            { id: 'green', name: 'Green Planet', desc: 'Reach 50% vegetation', check: () => gameState.vegetation >= 50, reward: { credits: 5000 } },
+            { id: 'habitable', name: 'Habitable!', desc: 'Complete terraforming', check: () => getHabitability() >= 100, reward: { win: true } }
+        ];
+
+        // DOM elements
+        const mars = document.getElementById('mars');
+        const marsView = document.getElementById('marsView');
+        const atmosphere = document.getElementById('atmosphere');
+        const waterEl = document.getElementById('water');
+        const vegetationEl = document.getElementById('vegetation');
+
+        // Initialize stars
+        function initStars() {
+            const canvas = document.getElementById('stars');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            for (let i = 0; i < 200; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 2;
+                const opacity = Math.random() * 0.8 + 0.2;
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Add craters to Mars
+        function addCraters() {
+            const surface = document.querySelector('.mars-surface');
+            const craterData = [
+                { x: 20, y: 30, size: 40 },
+                { x: 60, y: 20, size: 25 },
+                { x: 75, y: 60, size: 35 },
+                { x: 30, y: 70, size: 20 },
+                { x: 50, y: 45, size: 50 },
+                { x: 15, y: 55, size: 15 }
+            ];
+
+            craterData.forEach(c => {
+                const crater = document.createElement('div');
+                crater.className = 'crater';
+                crater.style.left = c.x + '%';
+                crater.style.top = c.y + '%';
+                crater.style.width = c.size + 'px';
+                crater.style.height = c.size + 'px';
+                surface.appendChild(crater);
+            });
+        }
+
+        // Calculate building cost
+        function getBuildingCost(building) {
+            const count = gameState.buildings[building.id] || 0;
+            return Math.floor(building.baseCost * Math.pow(building.costMultiplier, count));
+        }
+
+        // Check if building requirements are met
+        function checkRequirements(building) {
+            if (!building.requires) return true;
+            for (const [key, value] of Object.entries(building.requires)) {
+                if (gameState[key] < value) return false;
+            }
+            return true;
+        }
+
+        // Buy building
+        function buyBuilding(buildingId) {
+            const building = buildings.find(b => b.id === buildingId);
+            if (!building) return;
+
+            const cost = getBuildingCost(building);
+            if (gameState.credits < cost) return;
+            if (!checkRequirements(building)) return;
+
+            gameState.credits -= cost;
+            gameState.buildings[buildingId] = (gameState.buildings[buildingId] || 0) + 1;
+
+            // Apply one-time effects
+            if (building.effect.creditsPerClick) {
+                gameState.creditsPerClick += building.effect.creditsPerClick;
+            }
+
+            updateUI();
+            renderBuildings();
+        }
+
+        // Mars click handler
+        function handleMarsClick(e) {
+            gameState.credits += gameState.creditsPerClick;
+
+            // Visual feedback
+            const particle = document.createElement('div');
+            particle.className = 'click-particle';
+            particle.textContent = `+${gameState.creditsPerClick}`;
+            particle.style.left = e.clientX + 'px';
+            particle.style.top = e.clientY + 'px';
+            particle.style.color = '#f9ca24';
+            marsView.appendChild(particle);
+
+            setTimeout(() => particle.remove(), 1000);
+
+            updateUI();
+        }
+
+        // Calculate per-second production
+        function calculateProduction() {
+            let credits = 0;
+            let research = 0;
+            let temp = 0;
+            let oxygen = 0;
+            let water = 0;
+            let vegetation = 0;
+
+            for (const building of buildings) {
+                const count = gameState.buildings[building.id] || 0;
+                if (count === 0) continue;
+
+                const effect = building.effect;
+                if (effect.creditsPerSecond) credits += effect.creditsPerSecond * count;
+                if (effect.researchPerSecond) research += effect.researchPerSecond * count;
+                if (effect.temperature) temp += effect.temperature * count;
+                if (effect.oxygen) oxygen += effect.oxygen * count;
+                if (effect.water) water += effect.water * count;
+                if (effect.vegetation) vegetation += effect.vegetation * count;
+            }
+
+            return { credits, research, temp, oxygen, water, vegetation };
+        }
+
+        // Get habitability percentage
+        function getHabitability() {
+            return Math.min(100, (
+                gameState.temperature * 0.25 +
+                gameState.oxygen * 0.25 +
+                gameState.water * 0.25 +
+                gameState.vegetation * 0.25
+            ));
+        }
+
+        // Update game state
+        function gameLoop() {
+            if (gameState.gameWon) return;
+
+            const production = calculateProduction();
+
+            gameState.credits += production.credits / 10;
+            gameState.research += production.research / 10;
+            gameState.temperature = Math.min(100, gameState.temperature + production.temp / 10);
+            gameState.oxygen = Math.min(100, gameState.oxygen + production.oxygen / 10);
+            gameState.water = Math.min(100, gameState.water + production.water / 10);
+            gameState.vegetation = Math.min(100, gameState.vegetation + production.vegetation / 10);
+
+            gameState.creditsPerSecond = production.credits;
+            gameState.researchPerSecond = production.research;
+
+            // Check milestones
+            checkMilestones();
+
+            updateUI();
+            updateMarsVisuals();
+        }
+
+        // Check milestones
+        function checkMilestones() {
+            for (const milestone of milestones) {
+                if (gameState.milestones[milestone.id]) continue;
+                if (milestone.check()) {
+                    gameState.milestones[milestone.id] = true;
+
+                    if (milestone.reward.credits) {
+                        gameState.credits += milestone.reward.credits;
+                    }
+                    if (milestone.reward.win) {
+                        gameState.gameWon = true;
+                        document.getElementById('victoryScreen').classList.add('show');
+                    }
+
+                    renderMilestones();
+                }
+            }
+        }
+
+        // Update UI elements
+        function updateUI() {
+            document.getElementById('creditsValue').textContent = formatNumber(Math.floor(gameState.credits));
+            document.getElementById('researchValue').textContent = formatNumber(Math.floor(gameState.research));
+
+            document.getElementById('creditsRate').textContent =
+                gameState.creditsPerSecond > 0 ? `(+${formatNumber(gameState.creditsPerSecond)}/s)` : '';
+            document.getElementById('researchRate').textContent =
+                gameState.researchPerSecond > 0 ? `(+${formatNumber(gameState.researchPerSecond)}/s)` : '';
+
+            // Terraform stats
+            const temp = gameState.temperature;
+            const actualTemp = Math.floor(-60 + (temp / 100) * 75);
+            document.getElementById('tempBar').style.width = temp + '%';
+            document.getElementById('tempValue').textContent = actualTemp + '°C';
+
+            document.getElementById('oxygenBar').style.width = gameState.oxygen + '%';
+            document.getElementById('oxygenValue').textContent = Math.floor(gameState.oxygen * 0.21) + '%';
+
+            document.getElementById('waterBar').style.width = gameState.water + '%';
+            document.getElementById('waterValue').textContent = Math.floor(gameState.water * 0.7) + '%';
+
+            document.getElementById('vegBar').style.width = gameState.vegetation + '%';
+            document.getElementById('vegValue').textContent = Math.floor(gameState.vegetation * 0.3) + '%';
+
+            // Habitability
+            const habitability = getHabitability();
+            document.getElementById('habitableFill').style.width = habitability + '%';
+            document.getElementById('habitableFill').textContent = Math.floor(habitability) + '%';
+
+            // Update building availability
+            document.querySelectorAll('.building-card').forEach(card => {
+                const buildingId = card.dataset.buildingId;
+                const building = buildings.find(b => b.id === buildingId);
+                const cost = getBuildingCost(building);
+                const canAfford = gameState.credits >= cost;
+                const meetsRequirements = checkRequirements(building);
+
+                card.classList.toggle('disabled', !canAfford || !meetsRequirements);
+                card.querySelector('.building-cost').textContent = formatNumber(cost) + ' credits';
+            });
+        }
+
+        // Update Mars visuals based on terraform progress
+        function updateMarsVisuals() {
+            // Atmosphere color and intensity
+            const oxygenLevel = gameState.oxygen / 100;
+            const tempLevel = gameState.temperature / 100;
+
+            atmosphere.style.background = `radial-gradient(circle,
+                transparent 85%,
+                rgba(100, 150, 255, ${oxygenLevel * 0.4}) 95%,
+                rgba(135, 206, 235, ${oxygenLevel * 0.6}) 100%)`;
+
+            // Mars base color shifts
+            const r = Math.floor(212 - gameState.vegetation * 1.5);
+            const g = Math.floor(115 + gameState.vegetation * 0.5 + gameState.water * 0.3);
+            const b = Math.floor(74 + gameState.water * 1);
+
+            mars.style.background = `radial-gradient(circle at 30% 30%,
+                rgb(${r}, ${g}, ${b}) 0%,
+                rgb(${Math.floor(r*0.6)}, ${Math.floor(g*0.6)}, ${Math.floor(b*0.6)}) 40%,
+                rgb(${Math.floor(r*0.4)}, ${Math.floor(g*0.4)}, ${Math.floor(b*0.4)}) 80%,
+                rgb(${Math.floor(r*0.2)}, ${Math.floor(g*0.2)}, ${Math.floor(b*0.2)}) 100%)`;
+
+            // Water (oceans)
+            waterEl.innerHTML = '';
+            if (gameState.water > 5) {
+                const oceans = [
+                    { x: 10, y: 40, w: 30, h: 25 },
+                    { x: 55, y: 25, w: 25, h: 20 },
+                    { x: 40, y: 65, w: 35, h: 20 }
+                ];
+                oceans.forEach((o, i) => {
+                    const scale = Math.min(1, gameState.water / 50);
+                    const ocean = document.createElement('div');
+                    ocean.className = 'ocean';
+                    ocean.style.left = o.x + '%';
+                    ocean.style.top = o.y + '%';
+                    ocean.style.width = (o.w * scale) + '%';
+                    ocean.style.height = (o.h * scale) + '%';
+                    ocean.style.opacity = Math.min(0.8, gameState.water / 60);
+                    waterEl.appendChild(ocean);
+                });
+            }
+
+            // Vegetation (forests)
+            vegetationEl.innerHTML = '';
+            if (gameState.vegetation > 5) {
+                const forests = [
+                    { x: 20, y: 30, w: 20, h: 15 },
+                    { x: 50, y: 45, w: 25, h: 18 },
+                    { x: 15, y: 60, w: 22, h: 16 },
+                    { x: 60, y: 55, w: 18, h: 14 }
+                ];
+                forests.forEach((f, i) => {
+                    const scale = Math.min(1, gameState.vegetation / 50);
+                    const forest = document.createElement('div');
+                    forest.className = 'forest';
+                    forest.style.left = f.x + '%';
+                    forest.style.top = f.y + '%';
+                    forest.style.width = (f.w * scale) + '%';
+                    forest.style.height = (f.h * scale) + '%';
+                    forest.style.opacity = Math.min(0.8, gameState.vegetation / 60);
+                    vegetationEl.appendChild(forest);
+                });
+            }
+        }
+
+        // Render buildings list
+        function renderBuildings() {
+            const container = document.getElementById('buildingsList');
+            container.innerHTML = '';
+
+            for (const building of buildings) {
+                const cost = getBuildingCost(building);
+                const count = gameState.buildings[building.id] || 0;
+                const canAfford = gameState.credits >= cost;
+                const meetsRequirements = checkRequirements(building);
+
+                const card = document.createElement('div');
+                card.className = 'building-card' + (!canAfford || !meetsRequirements ? ' disabled' : '');
+                card.dataset.buildingId = building.id;
+
+                let requirementText = '';
+                if (building.requires && !meetsRequirements) {
+                    const reqs = Object.entries(building.requires)
+                        .map(([k, v]) => `${k}: ${v}%`)
+                        .join(', ');
+                    requirementText = `<div style="color: #e74c3c; font-size: 0.8rem;">Requires: ${reqs}</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="building-header">
+                        <span class="building-name">${building.icon} ${building.name}</span>
+                        <span class="building-count">${count}</span>
+                    </div>
+                    <div class="building-cost">${formatNumber(cost)} credits</div>
+                    <div class="building-effect">${building.description}</div>
+                    ${requirementText}
+                `;
+
+                card.addEventListener('click', () => buyBuilding(building.id));
+                container.appendChild(card);
+            }
+        }
+
+        // Render milestones
+        function renderMilestones() {
+            const container = document.getElementById('milestonesList');
+            container.innerHTML = '';
+
+            for (const milestone of milestones) {
+                const achieved = gameState.milestones[milestone.id];
+
+                const el = document.createElement('div');
+                el.className = 'milestone' + (achieved ? ' achieved' : '');
+                el.innerHTML = `
+                    <span class="milestone-icon">${achieved ? '✅' : '⬜'}</span>
+                    <div class="milestone-text">
+                        <div class="milestone-name">${milestone.name}</div>
+                        <div class="milestone-desc">${milestone.desc}</div>
+                    </div>
+                `;
+                container.appendChild(el);
+            }
+        }
+
+        // Format large numbers
+        function formatNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return Math.floor(num).toString();
+        }
+
+        // Initialize game
+        function init() {
+            initStars();
+            addCraters();
+            renderBuildings();
+            renderMilestones();
+            updateUI();
+            updateMarsVisuals();
+
+            mars.addEventListener('click', handleMarsClick);
+
+            // Game loop (10 times per second)
+            setInterval(gameLoop, 100);
+        }
+
+        init();
+    </script>
+</body>
+</html>
